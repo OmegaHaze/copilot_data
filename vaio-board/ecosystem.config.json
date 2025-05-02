@@ -1,0 +1,22 @@
+{
+  "apps": [
+    {
+      "name": "vaio",
+      "script": "uvicorn",
+      "args": "backend.main:app --host 0.0.0.0 --port 1888",
+      "cwd": "/home/vaio/vaio-board",
+      "interpreter": "python3",
+      "watch": false,
+      "instances": 1,
+      "exec_mode": "fork",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "log_date_format": "YYYY-MM-DD HH:mm:ss",
+      "error_file": "/home/vaio/vaio-board/workspace/logs/vaio-backend-error.log",
+      "out_file": "/home/vaio/vaio-board/workspace/logs/vaio-backend.log",
+      "merge_logs": false,
+      "autorestart": true
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+.admin-box {
+  width: 420px;
+  padding: 30px;
+  border: 2px solid #33ff33;
+  background-color: rgba(0, 0, 0, 0.85);
+  color: #33ff33;
+  font-family: 'Courier New', monospace;
+  text-align: center;
+  box-shadow: 0 0 10px #33ff33;
+  margin: 0 auto;
+}
+
+.scale-in {
+  animation: scaleIn 0.5s ease-out forwards;
+  transform: scale(0);
+}
+
+@keyframes scaleIn {
+  to {
+    transform: scale(1);
+  }
+}
+
+.admin-header {
+  font-size: 20px;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+}
+
+.input-line {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.admin-input {
+  background: transparent;
+  border: none;
+  color: #33ff33;
+  font-size: 18px;
+  font-family: inherit;
+  outline: none;
+  width: 220px;
+  text-align: left;
+}
+
+.admin-input::placeholder {
+  color: rgba(51, 255, 51, 0.3);
+  text-transform: uppercase;
+}
+
+.cursor {
+  margin-right: 5px;
+  color: #33ff33;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@keyframes glitch {
+  0% { transform: translate(0); opacity: 1; }
+  20% { transform: translate(-1px, 1px); }
+  40% { transform: translate(2px, -2px); }
+  60% { transform: translate(-2px, 2px); opacity: 0.8; }
+  80% { transform: translate(1px, -1px); }
+  100% { transform: translate(0); opacity: 1; }
+}
+
+.animate-glitch {
+  animation: glitch 300ms ease-in-out;
+}
