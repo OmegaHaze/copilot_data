@@ -1,0 +1,38 @@
+# Python build + cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual env
+.venv/
+env/
+venv/
+
+# Environment + secrets
+.env
+*.env
+.env.*
+
+# Node stuff (if frontend added)
+node_modules/
+dist/
+build/
+
+# VS Code/editor files
+.vscode/
+.idea/
+*.code-workspace
+
+# Logs + junk
+*.log
+.DS_Store
+Thumbs.db
+
+# Tests (if you don’t want Copilot training on fixtures)
+tests/__snapshots__/
+tests/fixtures/
+
+# Frontend build cruft (optional)
+*.map
+*.lock
