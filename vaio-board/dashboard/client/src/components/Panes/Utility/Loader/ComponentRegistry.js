@@ -1,9 +1,3 @@
-// ComponentRegistry.js - A centralized registry for all pane components
-
-/**
- * ComponentRegistry class - Manages pane components and their metadata
- * Provides a single source of truth for component loading, naming, and instances
- */
 class ComponentRegistry {
   constructor() {
     // Core component storage

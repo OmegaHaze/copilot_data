@@ -1,7 +1,3 @@
-/**
- * ServiceMatrix - Main container for the dashboard grid system
- * Orchestrates component loading, layout management, and service filtering
- */
 import { useEffect, useState, useContext, useCallback, useMemo } from 'react';
 import ServiceGrid from './ServiceGrid.jsx';
 import SidePanelLeft from '../../../Panels/SidePanelLeft.jsx';
@@ -11,14 +7,14 @@ import ErrorSkull from '../../../Error-Handling/ErrorSkull.jsx';
 import { SettingsContext } from '../../../SettingsMenu/SettingsContext.jsx';
 import { debouncedSaveToSession } from './LayoutManager.js';
 
-// Import simplified component and layout managers
-import { initComponentLoader, getPaneMap, getLogoMap } from './ComponentLoader.js';
-import { getBaseModuleType } from './ComponentRegistry.js';
+// Import the unified component system
+import { initializeComponentRegistry, getPaneMap, getLogoMap } from './ComponentRegistryInitializer.js';
+import { componentRegistry } from './ComponentRegistry.js';
 import { loadLayout, saveLayoutToLocal, createEmptyLayout, BREAKPOINTS } from './LayoutManager.js';
 import { useSocket } from '../SocketContext.jsx';
 
 /**
- * Filter items based on active modules
+ * Filter items based on active modules using the component registry
  * @param {Array} items - All available items
  * @param {Array} activeModules - List of active module IDs
  * @returns {Array} - Filtered items that match active modules
@@ -31,22 +27,18 @@ function filterByActiveModules(items, activeModules) {
   return items.filter(item => {
     if (!item) return false;
     
-    // Get the module name/key
-    const moduleName = (item.module || item.name || '').toLowerCase();
-    if (!moduleName) return false;
+    // Get the module key using the registry
+    const moduleKey = componentRegistry.getCanonicalKey(item.module || item.name);
+    if (!moduleKey) return false;
     
     // Check for direct module name match
-    if (activeModules.includes(moduleName)) {
+    if (activeModules.includes(moduleKey)) {
       return true;
     }
     
-    // Check for moduleType-instanceId format
+    // Check for module instances using canonical keys
     return activeModules.some(activeId => {
-      if (activeId.includes('-')) {
-        const baseType = getBaseModuleType(activeId);
-        return baseType === moduleName;
-      }
-      return false;
+      return componentRegistry.getCanonicalKey(activeId) === moduleKey;
     });
   });
 }
@@ -75,17 +67,24 @@ export default function ServiceMatrix() {
       try {
         setIsLoading(true);
         
-        const result = await initComponentLoader();
+        // Use the unified component registry initializer
+        const result = await initializeComponentRegistry();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to initialize component registry');
+        }
         
         // Store modules data
-        if (result?.moduleData) {
+        if (result.moduleData) {
           setModules(result.moduleData);
         }
         
-        // Log warnings for debugging
-        const componentKeys = Object.keys(result?.paneMap || {});
+        // Log success information
+        const componentKeys = Object.keys(result.paneMap || {});
+        console.log(`Initialized component registry with ${componentKeys.length} components`);
+        
         if (componentKeys.length === 0) {
-          console.error('No components were loaded!');
+          console.warn('No components were loaded!');
         }
         
         setIsLoading(false);
@@ -112,7 +111,7 @@ export default function ServiceMatrix() {
             ...(modules.user || [])
           ];
           
-          // Filter based on active modules
+          // Filter based on active modules using the registry
           const filteredItems = filterByActiveModules(allPotentialItems, activeModules);
           
           // Update filtered items for rendering

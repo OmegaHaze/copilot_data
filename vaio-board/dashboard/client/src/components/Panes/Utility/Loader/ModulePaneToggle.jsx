@@ -3,6 +3,7 @@ import { SettingsContext } from '../../../SettingsMenu/SettingsContext.jsx'
 import { useSocket } from '../../../Panes/Utility/SocketContext.jsx'
 import LaunchButton from './LaunchButton.jsx'
 import { saveLayoutToSession } from './LayoutManager.js'
+import { componentRegistry } from './ComponentRegistry.js'
 
 export default function ModulePaneToggle({ slug, label = null }) {
   const { gridLayout, setGridLayout, activeModules, setActiveModules } = useContext(SettingsContext)
@@ -12,11 +13,13 @@ export default function ModulePaneToggle({ slug, label = null }) {
   const findActiveInstances = () => {
     if (!Array.isArray(activeModules)) return [];
     
-    // Look for any modules that start with the base name
-    return activeModules.filter(moduleId => 
-      moduleId === slug || // Legacy case - plain module name
-      (moduleId.includes('-') && moduleId.split('-')[0] === slug) // New format: moduleType-instanceId
-    );
+    const canonicalSlug = componentRegistry.getCanonicalKey(slug);
+    
+    // Look for any modules that match the canonical key
+    return activeModules.filter(moduleId => {
+      const moduleKey = componentRegistry.getCanonicalKey(moduleId);
+      return moduleKey === canonicalSlug;
+    });
   };
   
   const activeInstances = findActiveInstances();

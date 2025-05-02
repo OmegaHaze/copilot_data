@@ -1,7 +1,12 @@
 /**
  * Module Registry - Defines the classification for each known module.
  * System, service, and user module types determine pane logic and display.
+ * Note: This file no longer contains component loading functions, which
+ * have been moved to ComponentRegistry.js for consistency.
  */
+
+// Import the component registry for canonical key resolution
+import { componentRegistry } from './ComponentRegistry.js';
 
 // Module type constants
 export const MODULE_TYPE = {
@@ -88,16 +93,14 @@ export function isEssentialModule(moduleKey) {
 }
 
 /**
- * Extract base module type from pane ID (e.g., "nvidia-123abc" → "nvidia")
- * Note: This function is kept for backward compatibility, but new code
- * should use componentRegistry.getCanonicalKey() instead
+ * Extract base module type from pane ID
+ * Now uses ComponentRegistry for canonical key resolution
  * 
  * @param {string} paneId - Full pane identifier
  * @returns {string|null} - Base module type or null
  */
 export function getBaseModuleType(paneId) {
-  if (!paneId) return null;
-  return paneId.includes("-") ? paneId.split("-")[0] : paneId;
+  return componentRegistry.getCanonicalKey(paneId);
 }
 
 /**
@@ -111,38 +114,23 @@ export function getInstanceId(paneId) {
 }
 
 /**
- * Parse a pane ID into its components
- * @param {string} paneId - Full pane identifier
- * @returns {{moduleType: string|null, instanceId: string|null}} - Parsed components
- */
-export function parsePaneId(paneId) {
-  return {
-    moduleType: getBaseModuleType(paneId),
-    instanceId: getInstanceId(paneId)
-  };
-}
-
-/**
  * Generate a unique module instance ID
- * Note: This function is kept for backward compatibility, but new code
- * should use componentRegistry.generateInstanceId() instead
+ * Now delegates to ComponentRegistry
  * 
  * @returns {string} - Random alphanumeric instance ID
  */
 export function generateInstanceId() {
-  return Math.random().toString(36).substring(2, 8);
+  return componentRegistry.generateInstanceId();
 }
 
 /**
  * Create a full pane ID by combining module type and instance ID
- * Note: This function is kept for backward compatibility, but new code
- * should use componentRegistry.createPaneId() instead
+ * Now delegates to ComponentRegistry
  * 
  * @param {string} moduleType - Module type identifier
  * @param {string} [instanceId] - Optional instance ID (generated if not provided)
  * @returns {string} - Full pane ID
  */
 export function createPaneId(moduleType, instanceId) {
-  const id = instanceId || generateInstanceId();
-  return `${moduleType}-${id}`;
+  return componentRegistry.createPaneId(moduleType, instanceId);
 }

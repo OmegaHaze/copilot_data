@@ -1,4 +1,4 @@
-// SupervisorPane.jsx - Moved to standard component loading approach
+// SupervisorPane.jsx - Now follows standard component loading approach
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import PaneHeader from '../PaneHeader';
 import { useSocket } from '../SocketContext';

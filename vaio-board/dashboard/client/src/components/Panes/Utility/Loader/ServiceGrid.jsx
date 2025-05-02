@@ -1,7 +1,3 @@
-/**
- * ServiceGrid - Core component for rendering the grid of panes/modules
- * Handles layout management and pane rendering with React Grid Layout
- */
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
@@ -57,43 +53,48 @@ export default function ServiceGrid({
 }) {
   const { isDragDisabled } = useDragDisable();
 
-  // Extract canonical key for a module/service item
+  // Get canonical key for a module/service item using the registry
   const getModuleKey = useCallback((item) => {
-    // Get canonical key using the registry
-    let key = '';
+    // Always use the component registry for key resolution
+    if (!item) return '';
     
-    if (item.moduleType) {
-      key = componentRegistry.getCanonicalKey(item.moduleType);
-    } else if (item.i && item.i.includes('-')) {
-      key = componentRegistry.getCanonicalKey(item.i);
-    } else if (item.module_type) {
-      key = componentRegistry.getCanonicalKey(item.module_type);
-    } else if (item.module || item.name) {
-      key = componentRegistry.getCanonicalKey(item.module || item.name);
-    }
-    
-    return key;
+    // Use the first available identifier
+    const identifier = item.moduleType || 
+                      (item.i && item.i.includes('-') ? item.i : null) ||
+                      item.module_type || 
+                      item.module || 
+                      item.name;
+                      
+    // Return the canonical key
+    return componentRegistry.getCanonicalKey(identifier);
   }, []);
 
   /**
-   * Render a single pane component
+   * Render a single pane component with proper error handling
    */
   const renderPane = useCallback((key, props, Component, className) => {
     if (!Component || typeof Component !== 'function') {
       console.warn(`Invalid component for ${key}, using DefaultPane`);
-      return (
-        <div key={props._gridId || key} className={className}>
-          <ErrorBoundary componentName={`Pane:${key}`}>
-            <DefaultPane {...props} slug={key} />
-          </ErrorBoundary>
-        </div>
-      );
+      return renderDefaultPane(key, props, className);
     }
 
     return (
       <div key={props._gridId || key} className={className}>
         <ErrorBoundary componentName={`Pane:${key}`}>
           <Component {...props} />
+        </ErrorBoundary>
+      </div>
+    );
+  }, []);
+  
+  /**
+   * Render a fallback default pane when component not found
+   */
+  const renderDefaultPane = useCallback((key, props, className) => {
+    return (
+      <div key={props._gridId || key} className={className}>
+        <ErrorBoundary componentName={`DefaultPane:${key}`}>
+          <DefaultPane {...props} slug={key} />
         </ErrorBoundary>
       </div>
     );
@@ -109,7 +110,7 @@ export default function ServiceGrid({
     // Get unique ID for this pane
     const gridItemId = item.i || `${type}-${Date.now()}`;
     
-    // Get the canonical module key for component lookup
+    // Get the canonical module key using component registry
     const moduleKey = getModuleKey(item);
     if (!moduleKey) {
       console.warn('Cannot determine module key for item:', item);
@@ -118,12 +119,6 @@ export default function ServiceGrid({
     
     // Get the component from paneMap
     const Component = paneMap[moduleKey];
-    
-    // Skip if component not found and log the issue
-    if (!Component) {
-      console.warn(`Component not found for ${moduleKey}. Available components:`, Object.keys(paneMap));
-      return;
-    }
     
     // Get styling based on module type
     const logo = item.logoUrl || logoUrls[moduleKey];
@@ -146,12 +141,14 @@ export default function ServiceGrid({
       moduleType
     };
 
-    // Render pane and add to collection
-    const renderedPane = renderPane(moduleKey, props, Component, className);
-    if (renderedPane) {
-      panes.push(renderedPane);
+    // Check if component exists and render appropriate pane
+    if (!Component) {
+      console.warn(`Component not found for ${moduleKey}.`);
+      panes.push(renderDefaultPane(moduleKey, props, className));
+    } else {
+      panes.push(renderPane(moduleKey, props, Component, className));
     }
-  }, [getModuleKey, paneMap, logoUrls, renderPane]);
+  }, [getModuleKey, paneMap, logoUrls, renderPane, renderDefaultPane]);
 
   /**
    * Render all panes based on services, layout items and modules
@@ -197,7 +194,7 @@ export default function ServiceGrid({
     }
 
     return panes;
-  }, [layout, services, modules, addPane]);
+  }, [layout, services, modules, addPane, getModuleKey]);
 
   /**
    * Handle layout changes from react-grid-layout
