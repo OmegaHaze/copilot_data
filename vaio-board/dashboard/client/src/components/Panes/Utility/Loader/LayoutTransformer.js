@@ -4,6 +4,7 @@
  * between different formats and storage systems.
  */
 
+// Import breakpoints from GridUtils to ensure consistency
 import { getBreakpoints } from './GridUtils.js';
 
 // Use breakpoints from GridUtils for consistency
@@ -83,8 +84,8 @@ export function sanitizeLayoutForStorage(layout) {
           y: item.y,
           w: item.w,
           h: item.h,
-          minW: item.minW,
-          minH: item.minH
+          minW: item.minW || 3,
+          minH: item.minH || 3
         };
         
         // Add optional properties if they exist
@@ -114,14 +115,14 @@ export function hydrateLayoutFromDB(storedLayout) {
       try {
         storedLayout = JSON.parse(storedLayout);
       } catch (parseErr) {
-        console.warn('⚠️ Failed to parse layout JSON:', parseErr);
+        console.warn('Failed to parse layout JSON:', parseErr);
         return normalizeLayout({});
       }
     }
     
     // Check if the layout is valid
     if (!storedLayout || typeof storedLayout !== 'object') {
-      console.warn('⚠️ Invalid layout data:', storedLayout);
+      console.warn('Invalid layout data:', storedLayout);
       return normalizeLayout({});
     }
     
@@ -147,7 +148,7 @@ export function hydrateLayoutFromDB(storedLayout) {
     // Normalize and return the converted layout
     return normalizeLayout(convertedLayout);
   } catch (err) {
-    console.warn('⚠️ Error processing layout data:', err);
+    console.warn('Error processing layout data:', err);
     return normalizeLayout({});
   }
 }

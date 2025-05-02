@@ -10,7 +10,8 @@ import { useEffect, useMemo, useCallback } from 'react';
 import { useDragDisable } from '../DragDisableContext.jsx';
 import { breakpoints, cols, isValidLayoutItem } from './GridUtils.js';
 import ErrorBoundary from '../../../Error-Handling/ErrorBoundary.jsx';
-import { getBaseModuleType } from './ComponentRegistry.js';
+import { componentRegistry } from './ComponentRegistry.js';
+import DefaultPane from '../Pane/DefaultPane.jsx';
 
 // Apply width provider HOC for responsive behavior
 const ResponsiveGridLayout = WidthProvider(Responsive);
@@ -56,22 +57,22 @@ export default function ServiceGrid({
 }) {
   const { isDragDisabled } = useDragDisable();
 
-  // Extract base key from a module/service item
+  // Extract canonical key for a module/service item
   const getModuleKey = useCallback((item) => {
-    // Get base module type from item in priority order
+    // Get canonical key using the registry
+    let key = '';
+    
     if (item.moduleType) {
-      return item.moduleType.toLowerCase();
+      key = componentRegistry.getCanonicalKey(item.moduleType);
+    } else if (item.i && item.i.includes('-')) {
+      key = componentRegistry.getCanonicalKey(item.i);
+    } else if (item.module_type) {
+      key = componentRegistry.getCanonicalKey(item.module_type);
+    } else if (item.module || item.name) {
+      key = componentRegistry.getCanonicalKey(item.module || item.name);
     }
     
-    if (item.i && item.i.includes('-')) {
-      return item.i.split('-')[0].toLowerCase();
-    }
-    
-    if (item.module_type) {
-      return item.module_type.toLowerCase();
-    }
-    
-    return (item.module || item.name || '').toLowerCase();
+    return key;
   }, []);
 
   /**
@@ -79,8 +80,14 @@ export default function ServiceGrid({
    */
   const renderPane = useCallback((key, props, Component, className) => {
     if (!Component || typeof Component !== 'function') {
-      console.error(`Invalid component for ${key}`);
-      return null;
+      console.warn(`Invalid component for ${key}, using DefaultPane`);
+      return (
+        <div key={props._gridId || key} className={className}>
+          <ErrorBoundary componentName={`Pane:${key}`}>
+            <DefaultPane {...props} slug={key} />
+          </ErrorBoundary>
+        </div>
+      );
     }
 
     return (
@@ -102,23 +109,28 @@ export default function ServiceGrid({
     // Get unique ID for this pane
     const gridItemId = item.i || `${type}-${Date.now()}`;
     
-    // Get the module key for component lookup
+    // Get the canonical module key for component lookup
     const moduleKey = getModuleKey(item);
+    if (!moduleKey) {
+      console.warn('Cannot determine module key for item:', item);
+      return;
+    }
     
     // Get the component from paneMap
     const Component = paneMap[moduleKey];
     
-    // Skip if component not found
-    if (!Component) return;
+    // Skip if component not found and log the issue
+    if (!Component) {
+      console.warn(`Component not found for ${moduleKey}. Available components:`, Object.keys(paneMap));
+      return;
+    }
     
     // Get styling based on module type
     const logo = item.logoUrl || logoUrls[moduleKey];
     const className = MODULE_TYPE_CLASSES[type] || MODULE_TYPE_CLASSES.default;
     
     // Extract module type for props
-    const moduleType = item.moduleType || item.module_type || 
-                        getBaseModuleType(item.i) || 
-                        item.module || moduleKey;
+    const moduleType = moduleKey;
 
     // Create standardized props for component
     const props = {

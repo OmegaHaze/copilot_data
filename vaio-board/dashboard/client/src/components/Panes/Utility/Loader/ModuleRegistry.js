@@ -89,6 +89,9 @@ export function isEssentialModule(moduleKey) {
 
 /**
  * Extract base module type from pane ID (e.g., "nvidia-123abc" → "nvidia")
+ * Note: This function is kept for backward compatibility, but new code
+ * should use componentRegistry.getCanonicalKey() instead
+ * 
  * @param {string} paneId - Full pane identifier
  * @returns {string|null} - Base module type or null
  */
@@ -121,6 +124,9 @@ export function parsePaneId(paneId) {
 
 /**
  * Generate a unique module instance ID
+ * Note: This function is kept for backward compatibility, but new code
+ * should use componentRegistry.generateInstanceId() instead
+ * 
  * @returns {string} - Random alphanumeric instance ID
  */
 export function generateInstanceId() {
@@ -129,6 +135,9 @@ export function generateInstanceId() {
 
 /**
  * Create a full pane ID by combining module type and instance ID
+ * Note: This function is kept for backward compatibility, but new code
+ * should use componentRegistry.createPaneId() instead
+ * 
  * @param {string} moduleType - Module type identifier
  * @param {string} [instanceId] - Optional instance ID (generated if not provided)
  * @returns {string} - Full pane ID
@@ -136,31 +145,4 @@ export function generateInstanceId() {
 export function createPaneId(moduleType, instanceId) {
   const id = instanceId || generateInstanceId();
   return `${moduleType}-${id}`;
-}
-
-/**
- * Get the canonical component key for a module type
- * This ensures consistency in component lookup regardless of how the module is referenced
- * 
- * @param {string} moduleType - Module type or other identifier
- * @returns {string} - Normalized component key for lookup
- */
-/**
- * Get the canonical (standard) component key for a given module type
- * This ensures consistent lookup across the application
- * 
- * @param {string} moduleType - The module type or identifier
- * @returns {string} - The canonical key for component lookup
- */
-export function getCanonicalComponentKey(moduleType) {
-  if (!moduleType) return '';
-  
-  // Convert to string in case we got something else
-  const typeStr = String(moduleType);
-  
-  // Extract base module type if this is a pane ID (e.g., "supervisor-abc123" -> "supervisor")
-  const baseType = typeStr.includes('-') ? typeStr.split('-')[0] : typeStr;
-  
-  // Return lowercase version for consistent lookup
-  return baseType.toLowerCase();
 }

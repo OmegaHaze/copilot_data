@@ -3,17 +3,17 @@
  * Provides advanced positioning algorithms for grid layouts
  */
 
-import { cols, getBreakpoints, findFirstAvailablePosition } from './GridUtils.js';
+import { cols, findFirstAvailablePosition } from './GridUtils.js';
 
-// Module-specific default sizes
+// Module-specific default sizes - larger sizes
 const MODULE_SIZE_MAP = {
-  'supervisor': { w: 6, h: 4 },
-  'nvidia': { w: 6, h: 4 },
-  'cpu': { w: 6, h: 3 },
-  'memory': { w: 6, h: 3 },
-  'disk': { w: 6, h: 4 },
-  'network': { w: 6, h: 4 },
-  'default': { w: 6, h: 4 }
+  'supervisor': { w: 12, h: 8 },
+  'nvidia': { w: 12, h: 8 },
+  'cpu': { w: 12, h: 6 },
+  'memory': { w: 12, h: 6 },
+  'disk': { w: 12, h: 8 },
+  'network': { w: 12, h: 8 },
+  'default': { w: 12, h: 8 }
 };
 
 /**
@@ -23,7 +23,7 @@ const MODULE_SIZE_MAP = {
  * @returns {Object} Width and height configuration
  */
 export function getModuleDefaultSize(moduleType) {
-  return MODULE_SIZE_MAP[moduleType] || MODULE_SIZE_MAP.default;
+  return MODULE_SIZE_MAP[moduleType.toLowerCase()] || MODULE_SIZE_MAP.default;
 }
 
 /**
@@ -32,43 +32,20 @@ export function getModuleDefaultSize(moduleType) {
  * 
  * @param {string} breakpoint - The breakpoint name (lg, md, sm, xs, xxs)
  * @param {Array} existingItems - The existing layout items for this breakpoint
- * @param {Object} newItemSize - Optional width and height for the new item
+ * @param {Object} newItemSize - Width and height for the new item
  * @returns {Object} - { x, y } coordinates for optimal placement
  */
-export function getOptimalPosition(breakpoint, existingItems = [], newItemSize = { w: 6, h: 4 }) {
+export function getOptimalPosition(breakpoint, existingItems = [], newItemSize = { w: 12, h: 8 }) {
   // Get column count for this breakpoint
   const colCount = cols[breakpoint] || 12;
   
   // If no existing items, start at the origin
-  if (!existingItems.length) {
+  if (!existingItems || !existingItems.length) {
     return { x: 0, y: 0 };
   }
   
-  // Normalize existing items to ensure valid properties
-  const normalizedItems = existingItems.map(item => ({
-    i: item.i,
-    x: item.x ?? 0,
-    y: item.y ?? 0,
-    w: item.w ?? 4,
-    h: item.h ?? 4
-  }));
-  
-  // First strategy: Find position below existing items
-  // Find maximum Y coordinate + height
-  const maxY = Math.max(
-    ...normalizedItems.map(item => item.y + item.h),
-    0 // Ensure non-empty array
-  );
-  
-  // Try to place at start of the next row
-  const belowPosition = { x: 0, y: maxY };
-  
-  // Second strategy: Find gaps in the layout
-  // Use the utility function from GridUtils to find a position
-  const gapPosition = findFirstAvailablePosition(normalizedItems, colCount, newItemSize);
-  
-  // Return the best position found
-  return gapPosition || belowPosition;
+  // Use the utility function from GridUtils to find the best position
+  return findFirstAvailablePosition(existingItems, colCount, newItemSize);
 }
 
 /**
@@ -86,9 +63,12 @@ export function createLayoutItemForAllBreakpoints(moduleType, instanceId, curren
   // Get default size based on module type
   const defaultSize = getModuleDefaultSize(moduleType);
   
+  // Get all breakpoints from the current layout or use defaults
+  const breakpoints = currentLayout ? Object.keys(currentLayout) : ['lg', 'md', 'sm', 'xs', 'xxs'];
+  
   // Create layout for each breakpoint
-  getBreakpoints().forEach(bp => {
-    const existingItems = currentLayout[bp] || [];
+  breakpoints.forEach(bp => {
+    const existingItems = currentLayout && currentLayout[bp] ? currentLayout[bp] : [];
     const position = getOptimalPosition(bp, existingItems, defaultSize);
     
     result[bp] = {
@@ -99,7 +79,7 @@ export function createLayoutItemForAllBreakpoints(moduleType, instanceId, curren
       y: position.y,
       w: defaultSize.w,
       h: defaultSize.h,
-      minW: 2,
+      minW: 3,
       minH: 3
     };
   });
@@ -116,10 +96,12 @@ export function createLayoutItemForAllBreakpoints(moduleType, instanceId, curren
  * @returns {Object} - Updated layout
  */
 export function updateLayoutItemSize(paneId, currentLayout, newSize) {
+  if (!currentLayout || !paneId) return currentLayout;
+  
   const result = { ...currentLayout };
   
   // Update each breakpoint
-  getBreakpoints().forEach(bp => {
+  Object.keys(result).forEach(bp => {
     if (!result[bp]) return;
     
     result[bp] = result[bp].map(item => {
@@ -145,7 +127,9 @@ export function updateLayoutItemSize(paneId, currentLayout, newSize) {
  * @returns {Object|null} - Found layout item or null
  */
 export function findLayoutItem(paneId, layout) {
-  for (const bp of getBreakpoints()) {
+  if (!layout || !paneId) return null;
+  
+  for (const bp of Object.keys(layout)) {
     const items = layout[bp] || [];
     const found = items.find(item => item.i === paneId);
     if (found) return found;

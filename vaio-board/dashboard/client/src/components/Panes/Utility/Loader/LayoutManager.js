@@ -1,11 +1,7 @@
-// filepath: /Loader/LayoutManager.js
+// LayoutManager.js - Responsible for layout operations and persistence
 
-import { getSessionData as getSessionDataFromLoader } from './ComponentRegistry.js';
+import { componentRegistry } from './ComponentRegistry.js';
 import { createLayoutItemForAllBreakpoints } from './LayoutPositioning.js';
-import {
-  hydrateLayoutFromDB,
-  sanitizeLayoutForStorage
-} from './LayoutTransformer.js';
 import debounce from 'lodash/debounce';
 
 // Constants
@@ -33,7 +29,7 @@ export function getLayoutFromStorage() {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored ? hydrateLayoutFromDB(stored) : null;
   } catch (err) {
-    console.warn('⚠️ Failed to parse layout from localStorage:', err);
+    console.warn('Failed to parse layout from localStorage:', err);
     return null;
   }
 }
@@ -49,7 +45,7 @@ export function saveLayoutToLocal(layout) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
     return true;
   } catch (err) {
-    console.error('🛑 Failed to save layout to localStorage:', err);
+    console.error('Failed to save layout to localStorage:', err);
     return false;
   }
 }
@@ -71,10 +67,10 @@ export async function saveLayoutToSession(layout) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     
     const data = await res.json();
-    console.log('💾 Synced layout to session');
+    console.log('Synced layout to session');
     return data;
   } catch (err) {
-    console.error('🛑 Failed to sync layout to session:', err);
+    console.error('Failed to sync layout to session:', err);
     return null;
   }
 }
@@ -114,7 +110,7 @@ export async function resolveLayout({ sessionData, items }) {
     
     // If we have active modules but no layout items, create them
     if (!hasLayoutItems) {
-      console.log('🚨 Found active modules without layout items, creating layout items for them');
+      console.log('Found active modules without layout items, creating layout items for them');
       const newLayout = createEmptyLayout();
       
       // Create layout items for each active module
@@ -136,8 +132,10 @@ export async function resolveLayout({ sessionData, items }) {
                 layoutItem.i = moduleId;
               }
               
+              // Explicitly set moduleType to ensure consistency
+              layoutItem.moduleType = moduleType;
+              
               newLayout[bp].push(layoutItem);
-              console.log(`Added layout item for ${bp}: ${JSON.stringify(layoutItem)}`);
             }
           });
         } else {
@@ -145,7 +143,7 @@ export async function resolveLayout({ sessionData, items }) {
         }
       }
       
-      console.log('✅ Created layout items for active modules:', newLayout);
+      console.log('Created layout items for active modules:', newLayout);
       
       // Save the new layout
       saveLayoutToLocal(newLayout);
@@ -157,20 +155,17 @@ export async function resolveLayout({ sessionData, items }) {
   
   // Check if we have a valid layout from the session
   if (fromSession && Object.keys(fromSession).length > 0) {
-    console.log('✅ Using layout from database session');
-    
-      return fromSession;
+    console.log('Using layout from database session');
+    return fromSession;
   }
   
-  // No fallback to localStorage - if session is empty, create new layout
-  
   // No valid layout found - create an empty layout structure
-  console.log('🆕 Creating empty layout structure - following explicit launch model');
+  console.log('Creating empty layout structure - following explicit launch model');
   
   // Create empty layout structure for all breakpoints
   const emptyLayout = createEmptyLayout();
   
-  // Save this empty layout to the database only
+  // Save this empty layout to the database
   await saveLayoutToSession(emptyLayout);
   
   return emptyLayout;
@@ -182,11 +177,11 @@ export async function resolveLayout({ sessionData, items }) {
  * @returns {Object} The resolved layout
  */
 export const loadLayout = async (items = []) => {
-  console.log('🔄 Loading layout for items:', items.length);
+  console.log('Loading layout for items:', items.length);
   
-  // Get session data from the component loader
-  const sessionData = getSessionDataFromLoader();
-  console.log('📋 Session data loaded:', {
+  // Get session data from the component registry
+  const sessionData = componentRegistry.getModuleData();
+  console.log('Session data loaded:', {
     hasGridLayout: !!sessionData?.grid_layout,
     itemCount: items.length
   });
@@ -194,13 +189,136 @@ export const loadLayout = async (items = []) => {
   // Create a layout based on available data
   const layout = await resolveLayout({ 
     sessionData, 
-    items // Pass items directly, they're already merged in ServiceMatrix
+    items
   });
   
-  console.log('📊 Resolved layout:', {
+  console.log('Resolved layout:', {
     breakpoints: Object.keys(layout),
     itemCount: layout.lg ? layout.lg.length : 0
   });
   
   return layout;
 };
+
+/**
+ * Rehydrates layout data from backend/localStorage for use in React Grid Layout
+ * @param {Object|string} storedLayout - Layout data from storage
+ * @returns {Object} Processed layout ready for use
+ */
+export function hydrateLayoutFromDB(storedLayout) {
+  try {
+    // Parse JSON string if needed
+    if (typeof storedLayout === 'string') {
+      try {
+        storedLayout = JSON.parse(storedLayout);
+      } catch (parseErr) {
+        console.warn('Failed to parse layout JSON:', parseErr);
+        return normalizeLayout({});
+      }
+    }
+    
+    // Check if the layout is valid
+    if (!storedLayout || typeof storedLayout !== 'object') {
+      console.warn('Invalid layout data:', storedLayout);
+      return normalizeLayout({});
+    }
+    
+    // Handle different storage formats
+    const convertedLayout = {};
+    BREAKPOINTS.forEach(bp => {
+      // Initialize each breakpoint with an empty array
+      convertedLayout[bp] = [];
+      
+      // Skip if no data for this breakpoint
+      if (!storedLayout[bp]) return;
+      
+      // Handle array format
+      if (Array.isArray(storedLayout[bp])) {
+        convertedLayout[bp] = storedLayout[bp];
+      }
+      // Handle object/dictionary format
+      else if (typeof storedLayout[bp] === 'object') {
+        convertedLayout[bp] = Object.values(storedLayout[bp]);
+      }
+    });
+    
+    // Normalize and return the converted layout
+    return normalizeLayout(convertedLayout);
+  } catch (err) {
+    console.warn('Error processing layout data:', err);
+    return normalizeLayout({});
+  }
+}
+
+/**
+ * Ensures a layout has all breakpoints and only contains valid items
+ * @param {Object} layout - Layout to normalize
+ * @returns {Object} Normalized layout
+ */
+export function normalizeLayout(layout) {
+  const safeLayout = {};
+
+  BREAKPOINTS.forEach(bp => {
+    const items = layout?.[bp];
+    safeLayout[bp] = Array.isArray(items)
+      ? items.filter(item => isValidLayoutItem(item))
+      : [];
+  });
+
+  return safeLayout;
+}
+
+/**
+ * Validates an individual layout item
+ * @param {Object} item - Layout item to validate
+ * @returns {boolean} True if item is valid
+ */
+function isValidLayoutItem(item) {
+  return (
+    item && 
+    typeof item === 'object' &&
+    typeof item.i === 'string' && 
+    item.i.length > 0 &&
+    typeof item.x === 'number' &&
+    typeof item.y === 'number' &&
+    typeof item.w === 'number' &&
+    typeof item.h === 'number'
+  );
+}
+
+/**
+ * Prepares a layout object for storage by removing invalid items
+ * @param {Object} layout - Layout to sanitize
+ * @returns {Object} Sanitized layout
+ */
+export function sanitizeLayoutForStorage(layout) {
+  // Normalize the layout to ensure proper structure
+  const normalized = normalizeLayout(layout);
+  
+  // Remove any internal metadata properties that shouldn't be stored
+  BREAKPOINTS.forEach(bp => {
+    if (normalized[bp]) {
+      normalized[bp] = normalized[bp].map(item => {
+        // Create a clean copy of the item
+        const cleanItem = {
+          i: item.i,
+          x: item.x,
+          y: item.y,
+          w: item.w,
+          h: item.h,
+          minW: item.minW,
+          minH: item.minH
+        };
+        
+        // Add optional properties if they exist
+        if (item.moduleType) cleanItem.moduleType = item.moduleType;
+        if (item.instanceId) cleanItem.instanceId = item.instanceId;
+        if (item.static !== undefined) cleanItem.static = item.static;
+        
+        return cleanItem;
+      });
+    }
+  });
+
+  return normalized;
+}

@@ -92,8 +92,6 @@ export default function LaunchButton({ moduleType, label = null }) {
         item.moduleType = moduleType; // Explicitly set moduleType
       });
       
-      console.log(`LaunchButton: Created layout items with moduleType=${moduleType}:`, newLayoutItems);
-      
       // 2. Create a proper updated layout structure
       const updatedLayout = { ...gridLayout };
       
@@ -117,8 +115,8 @@ export default function LaunchButton({ moduleType, label = null }) {
       setGridLayout(updatedLayout);
       setActiveModules(updatedModules);
 
-      // 6. Update active modules in session
-      console.log('📝 Updating active modules on server:', updatedModules);
+      // 5. Update active modules in session
+      console.log('Updating active modules on server:', updatedModules);
       try {
         const moduleResponse = await fetch("/api/user/session/modules", {
           method: "PUT",
@@ -132,24 +130,24 @@ export default function LaunchButton({ moduleType, label = null }) {
           // Continue despite failure - we can still try to update the layout
         } else {
           const responseData = await moduleResponse.json();
-          console.log('✅ Active modules updated:', responseData);
+          console.log('Active modules updated:', responseData);
         }
       } catch (moduleError) {
-        console.error('❌ Error updating active modules:', moduleError);
+        console.error('Error updating active modules:', moduleError);
         // Continue despite failure - we can still try to update the layout
       }
 
-      // 7. Save updated layout to session
-      console.log('📊 Saving layout to session:', updatedLayout);
+      // 6. Save updated layout to session
+      console.log('Saving layout to session:', updatedLayout);
       const layoutData = await saveLayoutToSession(updatedLayout);
       
       if (!layoutData) {
         throw new Error('Failed to save layout to session');
       }
       
-      // 8. Emit socket event to notify other components
+      // 7. Emit socket event to notify other components
       if (socket && typeof socket.emit === 'function') {
-        console.log('🔄 Emitting pane:launched event');
+        console.log('Emitting pane:launched event');
         socket.emit("pane:launched", { 
           moduleType,
           module_type: moduleType, // Add module_type for backend compatibility
@@ -159,31 +157,26 @@ export default function LaunchButton({ moduleType, label = null }) {
         });
         
         // Also emit a direct connection to the module's namespace
-        console.log(`🔌 Requesting connection to module namespace: ${moduleType}`);
+        console.log(`Requesting connection to module namespace: ${moduleType}`);
         socket.emit("connect:module", {
           name: moduleType,
           module_type: moduleType
         });
-        
-        // Add direct debug info to help diagnose component loading issues
-        if (window.vaioDebug) {
-          window.vaioDebug.log(`LaunchButton: Launched ${moduleType} module with ID ${paneId}`);
-          
-          // For supervisor specifically, check if the component is loaded
-          if (moduleType === 'supervisor' && window.components) {
-            const hasComponent = !!window.components['supervisor'];
-            window.vaioDebug.log(`Supervisor component availability: ${hasComponent ? 'Yes' : 'No'}`);
-          }
-        }
       }
       
-      console.log(`✅ Successfully launched module ${moduleType} with instance ID ${instanceId}`);
+      console.log(`Successfully launched module ${moduleType} with instance ID ${instanceId}`);
     } catch (err) {
-      console.error(`❌ Failed to launch pane: ${moduleType}`, err);
+      console.error(`Failed to launch pane: ${moduleType}`, err);
       setError(err.message || 'Failed to launch module');
       
-      // Show error and continue - don't revert state changes since 
-      // we already have localStorage backup
+      // Show error in notification system if available
+      if (window.errorSystem && typeof window.errorSystem.showError === 'function') {
+        window.errorSystem.showError(
+          `Failed to launch module: ${err.message}`, 
+          'error',
+          10000
+        );
+      }
     } finally {
       setIsLaunching(false);
     }

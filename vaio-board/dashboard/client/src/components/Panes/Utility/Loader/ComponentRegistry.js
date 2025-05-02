@@ -1,4 +1,9 @@
-// ComponentRegistry.js (new unified version)
+// ComponentRegistry.js - A centralized registry for all pane components
+
+/**
+ * ComponentRegistry class - Manages pane components and their metadata
+ * Provides a single source of truth for component loading, naming, and instances
+ */
 class ComponentRegistry {
   constructor() {
     // Core component storage
@@ -8,14 +13,14 @@ class ComponentRegistry {
     this.errors = new Map();        // Maps moduleType -> error info
     this.loadPromises = new Map();  // Maps moduleType -> loading Promise
 
-    // Module type categorization - all modules treated equally
+    // Module type categorization
     this.moduleTypes = {
       system: new Set(),
       service: new Set(), 
       user: new Set()
     };
     
-    // A single place to store module data (previously duplicated)
+    // Module data storage
     this.moduleData = {
       all: [],
       system: [],
@@ -34,7 +39,7 @@ class ComponentRegistry {
     return this;
   }
 
-  // Asynchronously load a component
+  // Asynchronously load a component with consistent error handling
   async loadComponent(moduleType, componentName = null) {
     const key = this.getCanonicalKey(moduleType);
     
@@ -53,7 +58,7 @@ class ComponentRegistry {
       const compName = componentName || this.getComponentName(key);
       const importPath = `../Pane/${compName}.jsx`;
       
-      // Create and store loading promise - one consistent path for all components
+      // Create and store loading promise
       const loadPromise = import(importPath)
         .then(module => {
           if (module.default) {
@@ -63,18 +68,16 @@ class ComponentRegistry {
           throw new Error(`No default export in ${importPath}`);
         })
         .catch(err => {
-          // Record error but don't attempt to load special fallbacks
           this.errors.set(key, {
             error: err.message,
             timestamp: new Date().toISOString(),
             component: compName
           });
           
-          console.warn(`❌ Failed to import component ${compName} for ${key}:`, err.message);
+          console.warn(`Failed to import component ${compName} for ${key}:`, err.message);
           return null;
         })
         .finally(() => {
-          // Clean up promise reference after loading completes
           this.loadPromises.delete(key);
         });
       
@@ -172,11 +175,7 @@ class ComponentRegistry {
     this.errors.delete(key);
   }
 
-  /**
-   * Set the category for a module type (system, service, user)
-   * @param {string} moduleType - The module type identifier
-   * @param {string} category - Category (system, service, user)
-   */
+  // Set the category for a module type
   setCategoryForModule(moduleType, category) {
     const key = this.getCanonicalKey(moduleType);
     
@@ -194,11 +193,7 @@ class ComponentRegistry {
     this.moduleTypes[category].add(key);
   }
 
-  /**
-   * Get the category for a module type
-   * @param {string} moduleType - The module type identifier
-   * @returns {string} - Category (system, service, user) or 'unknown'
-   */
+  // Get the category for a module type
   getCategoryForModule(moduleType) {
     const key = this.getCanonicalKey(moduleType);
     
@@ -211,9 +206,7 @@ class ComponentRegistry {
     return 'unknown';
   }
   
-  /**
-   * Store module data and automatically categorize modules
-   */
+  // Store module data and automatically categorize modules
   setModuleData(data) {
     if (!data) return;
     
@@ -256,27 +249,21 @@ class ComponentRegistry {
     return this.moduleData;
   }
   
-  /**
-   * Set initialization state
-   * @param {boolean} state - Whether the registry is initialized
-   */
+  // Set initialization state
   setInitialized(state) {
     this.initialized = state;
   }
   
-  /**
-   * Check if the registry is initialized
-   * @returns {boolean} - Initialization state
-   */
+  // Check if the registry is initialized
   isInitialized() {
     return this.initialized;
   }
 }
 
-// Export singleton
+// Export singleton instance
 export const componentRegistry = new ComponentRegistry();
 
-// Export commonly used functions directly for convenience and backward compatibility
+// Export commonly used functions directly for convenience
 export const getCanonicalComponentKey = (key) => componentRegistry.getCanonicalKey(key);
 export const getComponentName = (key) => componentRegistry.getComponentName(key);
 export const getModuleData = () => componentRegistry.getModuleData();
@@ -284,8 +271,6 @@ export const setModuleData = (data) => componentRegistry.setModuleData(data);
 
 /**
  * Get the base module type from a pane ID
- * @param {string} paneId - Full pane identifier (e.g., "nvidia-123abc")
- * @returns {string|null} - Base module type or null
  */
 export function getBaseModuleType(paneId) {
   return componentRegistry.getCanonicalKey(paneId);
@@ -293,9 +278,6 @@ export function getBaseModuleType(paneId) {
 
 /**
  * Create a full pane ID
- * @param {string} moduleType - Module type
- * @param {string} [instanceId] - Optional instance ID
- * @returns {string} - Full pane ID
  */
 export function createPaneId(moduleType, instanceId) {
   return componentRegistry.createPaneId(moduleType, instanceId);
@@ -308,7 +290,7 @@ export function debugComponentRegistry() {
   const components = componentRegistry.getAllComponentKeys();
   const errors = componentRegistry.getErrors();
   
-  console.group('🔍 Component Registry Debug');
+  console.group('Component Registry Debug');
   console.log(`Loaded Components (${components.length}):`, components.join(', '));
   
   const errorKeys = Object.keys(errors);
@@ -321,42 +303,16 @@ export function debugComponentRegistry() {
   return {
     loaded: components,
     missing: errorKeys,
-    missingComponents: errorKeys, // For backward compatibility
     total: components.length + errorKeys.length
   };
 }
 
-/**
- * Simple component loading status diagnostic
- */
-export function diagnoseComponentRegistration() {
-  const loadedComponents = componentRegistry.getAllComponentKeys();
-  const errors = componentRegistry.getErrors();
-  const nullComponents = Object.keys(errors);
-  
-  // Create diagnosis report
-  const diagnosis = {
-    totalComponents: loadedComponents.length + nullComponents.length,
-    loadedComponents,
-    nullComponents,
-    // Add for backward compatibility with existing code
-    availableComponents: loadedComponents,
-    missingComponents: nullComponents,
-    timestamp: new Date().toISOString()
-  };
-  
-  return diagnosis;
-}
-
-/**
- * Register debugging helpers on the window object
- * Only used in development mode
- */
+// Register debugging helpers on the window object in development
 export function registerDebugHelpers() {
   // Only expose in non-production environments
   if (process.env.NODE_ENV === 'production') return;
   
-  // Return a copy of the map with additional information about component validity
+  // Enhanced component map for debugging
   window.getPaneMap = () => {
     const enhancedMap = {};
     
@@ -378,7 +334,7 @@ export function registerDebugHelpers() {
     return enhancedMap;
   };
   
-  // Find any pane components that failed to load or aren't valid React components
+  // Find any pane components that failed to load
   window.getPaneMapErrors = () => {
     const errors = componentRegistry.getErrors();
     
@@ -387,68 +343,4 @@ export function registerDebugHelpers() {
       error: errorInfo
     }));
   };
-  
-  // Set up componentRegistry on window.vaioDebug for the forceReload functionality
-  if (window.vaioDebug) {
-    window.vaioDebug.componentRegistry = {
-      // Function to force reload a component with error handling
-      forceReload: async (moduleKey) => {
-        try {
-          if (!moduleKey) {
-            window.vaioDebug.warn("Please specify a moduleType to reload");
-            return false;
-          }
-          
-          const key = componentRegistry.getCanonicalKey(moduleKey);
-          console.log(`🔄 Reloading component: ${key}`);
-          
-          // Clear any existing errors
-          componentRegistry.clearError(key);
-          
-          // Get the component name
-          const componentName = componentRegistry.getComponentName(key);
-          
-          // Try to load the component
-          const component = await componentRegistry.loadComponent(key, componentName);
-          
-          if (component) {
-            window.vaioDebug.success(`Reloaded component: ${key}`);
-            return true;
-          } else {
-            window.vaioDebug.error(`Failed to reload component: ${key}`);
-            return false;
-          }
-        } catch(err) {
-          console.error('Error in forceReloadComponent:', err);
-          window.vaioDebug.error(`Error reloading component: ${err.message}`);
-          return false;
-        }
-      },
-      
-      // Get debug data about component registry
-      getDebugData: () => {
-        try {
-          const components = componentRegistry.getAllComponentKeys();
-          const errors = componentRegistry.getErrors();
-          
-          return {
-            componentCount: components.length,
-            loadedCount: components.length,
-            errorCount: Object.keys(errors).length,
-            moduleTypes: components,
-            hasErrors: Object.keys(errors).length > 0
-          };
-        } catch(err) {
-          console.error('Error in getDebugData:', err);
-          return {
-            componentCount: 0,
-            loadedCount: 0,
-            errorCount: 0,
-            moduleTypes: [],
-            hasErrors: false
-          };
-        }
-      }
-    };
-  }
 }

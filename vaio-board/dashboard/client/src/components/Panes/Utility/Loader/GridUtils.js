@@ -3,9 +3,9 @@
  * Provides constants and functions for grid layout generation
  */
 
-// Default dimensions for grid items
-export const DEFAULT_WIDTH = 6;
-export const DEFAULT_HEIGHT = 4;
+// Default dimensions for grid items (doubled from original)
+export const DEFAULT_WIDTH = 12;
+export const DEFAULT_HEIGHT = 8;
 
 /**
  * Breakpoint definitions for responsive layouts
@@ -81,8 +81,8 @@ export function generateLayoutForBreakpoint(items = [], colCount = 48) {
       w,              // Width
       h,              // Height
       static: false,  // Allow movement/resizing
-      minW: 2,        // Minimum width
-      minH: 2         // Minimum height
+      minW: 3,        // Minimum width (increased)
+      minH: 3         // Minimum height (increased)
     });
 
     // Calculate next position
@@ -138,15 +138,32 @@ export function isValidLayoutItem(item) {
  * 
  * @param {Array} layoutItems - Existing layout items
  * @param {number} colCount - Number of columns available
+ * @param {Object} itemSize - Size of the new item to place
  * @returns {Object} {x, y} position
  */
-export function findFirstAvailablePosition(layoutItems = [], colCount = 48) {
+export function findFirstAvailablePosition(layoutItems = [], colCount = 48, itemSize = { w: DEFAULT_WIDTH, h: DEFAULT_HEIGHT }) {
   // If no items, start at origin
-  if (layoutItems.length === 0) return { x: 0, y: 0 };
+  if (!layoutItems.length) return { x: 0, y: 0 };
   
   // Find the maximum Y position used
-  const maxY = Math.max(...layoutItems.map(item => item.y + item.h));
+  const maxY = Math.max(...layoutItems.map(item => item.y + item.h), 0);
   
-  // Start a new row
+  // First, try to find a free spot in the last row
+  const lastRowItems = layoutItems.filter(item => item.y + item.h > maxY - itemSize.h);
+  
+  // Sort the last row items by x position
+  lastRowItems.sort((a, b) => a.x - b.x);
+  
+  // Check if there's enough space at the end of the last row
+  if (lastRowItems.length > 0) {
+    const lastItem = lastRowItems[lastRowItems.length - 1];
+    const potentialX = lastItem.x + lastItem.w;
+    
+    if (potentialX + itemSize.w <= colCount) {
+      return { x: potentialX, y: lastItem.y };
+    }
+  }
+  
+  // If we can't find space in the last row, start a new row
   return { x: 0, y: maxY };
 }
