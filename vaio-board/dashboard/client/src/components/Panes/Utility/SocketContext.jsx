@@ -1,4 +1,3 @@
-// filepath: /home/vaio/vaio-board/dashboard/client/src/components/Panes/Utility/SocketContext.jsx
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 
@@ -131,35 +130,36 @@ export function SocketProvider({ children }) {
   }, []);
   
   /**
-   * Fetch supervisor logs from backend (for initial loading)
+   * Fetch log file from backend by filename
+   * @param {string} filename - Name of the log file to fetch
    */
-  const fetchSupervisorLogs = useCallback(async () => {
+  const fetchLogFile = useCallback(async (filename) => {
     try {
-      console.log('Fetching supervisor logs via REST API...');
+      console.log(`Fetching log file: ${filename} via REST API...`);
       
       // Add cache-busting timestamp for fresh results
       const timestamp = new Date().getTime();
-      const response = await fetch(`/api/logs/file?filename=supervisord.log&_t=${timestamp}`);
+      const response = await fetch(`/api/logs/file?filename=${filename}&_t=${timestamp}`);
       
       if (!response.ok) {
-        console.error(`Failed to fetch supervisor logs (${response.status})`);
+        console.error(`Failed to fetch log file ${filename} (${response.status})`);
         throw new Error(`Server returned ${response.status}: ${response.statusText}`);
       }
       
       const logContent = await response.text();
       if (logContent) {
-        console.log(`Got ${logContent.length} bytes of supervisor logs`);
+        console.log(`Got ${logContent.length} bytes of ${filename} logs`);
         
         // Update log streams directly
         setLogStreams(prev => ({
           ...prev,
-          'supervisord.log': logContent
+          [filename]: logContent
         }));
         
         return logContent;
       }
     } catch (error) {
-      console.error('Error fetching supervisor logs:', error);
+      console.error(`Error fetching ${filename} logs:`, error);
       throw error;
     }
   }, []);
@@ -227,16 +227,13 @@ export function SocketProvider({ children }) {
       // Add a line break if it doesn't already end with one
       const formattedData = cleanData.endsWith('\n') ? cleanData : cleanData + '\n';
       
-      // Check if this is a supervisor log and needs special handling
-      if (serviceName === 'supervisord.log' && formattedData.includes('supervisor')) {
-        // For supervisor logs, check for repeated lines to avoid spamming
-        const currentBuffer = logBufferRef.current[serviceName] || '';
-        const lastLine = currentBuffer.split('\n').pop() || '';
-        
-        // Skip if this is just repeating the same content
-        if (lastLine.trim() === formattedData.trim()) {
-          return;
-        }
+      // Check for repeated lines to avoid spamming - applies to all services
+      const currentBuffer = logBufferRef.current[serviceName] || '';
+      const lastLine = currentBuffer.split('\n').pop() || '';
+      
+      // Skip if this is just repeating the same content
+      if (lastLine.trim() === formattedData.trim()) {
+        return;
       }
       
       // Add to buffer
@@ -291,23 +288,10 @@ export function SocketProvider({ children }) {
           return service;
         }
         
-        // Otherwise, try to determine it from the service name
-        // This is for backward compatibility with older backend responses
-        let moduleType = "service"; // Default type
-        
-        // Check for known system modules
-        if (service.name.toLowerCase() === "supervisor" || 
-            service.name.toLowerCase() === "system") {
-          moduleType = "system";
-        } 
-        // Check for user modules (custom logic if needed)
-        else if (service._isUserPane) {
-          moduleType = "user";
-        }
-        
+        // Default to "service" type if not specified
         return {
           ...service,
-          module_type: moduleType
+          module_type: "service"
         };
       });
       
@@ -409,7 +393,7 @@ export function SocketProvider({ children }) {
       setConnected(false);
     });
     
-    // Log stream handlers
+    // Generic log stream handler for all services
     mainSocket.on('logStream', (data) => {
       if (data && data.filename && data.line) {
         if (CONFIG.DEBUG_LOG_STREAMS) {
@@ -422,35 +406,14 @@ export function SocketProvider({ children }) {
     // Unified log handler
     mainSocket.on('unified_log', handleUnifiedLog);
     
-    // Supervisor log handler with deduplication
-    let lastSupervisorLine = '';
-    let duplicateCount = 0;
-    mainSocket.on('supervisorLogStream', (line) => {
-      if (CONFIG.DEBUG_LOG_STREAMS) {
-        console.log('Received supervisorLogStream event');
-      }
-      
-      // Skip duplicate consecutive lines
-      if (line === lastSupervisorLine) {
-        duplicateCount++;
-        // Only log every 10th duplicate to avoid spamming
-        if (duplicateCount % 10 === 0) {
-          updateLogStream('supervisord.log', `[Repeated message x${duplicateCount}]`);
+    // Generic log handler for all services
+    mainSocket.on('serviceLogStream', (data) => {
+      if (data && data.service && data.line) {
+        if (CONFIG.DEBUG_LOG_STREAMS) {
+          console.log(`Received serviceLogStream event for ${data.service}`);
         }
-        return;
+        updateLogStream(data.service, data.line);
       }
-      
-      // Reset duplicate counter if line changes
-      if (duplicateCount > 0) {
-        updateLogStream('supervisord.log', `[End of repeated messages]`);
-        duplicateCount = 0;
-      }
-      
-      // Remember this line for deduplication
-      lastSupervisorLine = line;
-      
-      // Only update one log stream to avoid duplicates
-      updateLogStream('supervisord.log', line);
     });
     
     // Service status handlers
@@ -595,7 +558,7 @@ export function SocketProvider({ children }) {
     servicesWithErrors,
     metricsData,
     getMetricsSocket,
-    fetchSupervisorLogs  // Add the function to fetch supervisor logs to the context
+    fetchLogFile
   };
   
   return (
