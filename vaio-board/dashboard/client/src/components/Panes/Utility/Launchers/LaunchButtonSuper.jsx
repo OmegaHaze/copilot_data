@@ -1,16 +1,15 @@
-// LaunchButton.jsx - Properly launches a module with instanceId and layout updates
+// LaunchButtonSuper.jsx - Properly launches the Supervisor pane with instanceId and layout updates
 import { useContext, useState, useEffect } from 'react';
 import { SettingsContext } from '../../../SettingsMenu/SettingsContext.jsx';
 import { useSocket } from '../SocketContext.jsx';
 import { 
-  saveLayoutToSession, 
-  saveLayoutToLocal, 
+  saveLayoutToSession,
   BREAKPOINTS 
-} from './LayoutManager.js';
-import { createLayoutItemForAllBreakpoints } from './LayoutPositioning.js';
-import { componentRegistry } from './ComponentRegistry.js';
+} from '../Loader/LayoutManager.js';
+import { createLayoutItemForAllBreakpoints } from '../Loader/LayoutPositioning.js';
+import { componentRegistry } from '../Loader/ComponentRegistry.js';
 
-export default function LaunchButton({ moduleType, label = null }) {
+export default function LaunchButtonSuper({ moduleType, label = null }) {
   const { gridLayout, setGridLayout, activeModules, setActiveModules } = useContext(SettingsContext);
   const { socket } = useSocket();
   const [isLaunching, setIsLaunching] = useState(false);
@@ -82,14 +81,32 @@ export default function LaunchButton({ moduleType, label = null }) {
 
     try {
       // 1. Use LayoutPositioning utility to create optimally positioned layout items
+      console.log(`Creating layout items for ${moduleType} with instanceId ${instanceId}`);
+      console.log('Current grid layout:', gridLayout);
+      
       const newLayoutItems = createLayoutItemForAllBreakpoints(moduleType, instanceId, gridLayout);
+      console.log('Generated new layout items:', newLayoutItems);
+      
       if (!newLayoutItems) {
         throw new Error('Failed to create layout items');
       }
       
+      // Verify we got layout items for all breakpoints
+      const missingBreakpoints = BREAKPOINTS.filter(bp => !newLayoutItems[bp]);
+      if (missingBreakpoints.length > 0) {
+        console.warn(`Missing layout items for breakpoints: ${missingBreakpoints.join(', ')}`);
+      }
+      
       // Ensure layout items have the moduleType property set correctly
       Object.values(newLayoutItems).forEach(item => {
+        if (!item) {
+          console.warn(`Invalid layout item found in newLayoutItems`);
+          return;
+        }
         item.moduleType = moduleType; // Explicitly set moduleType
+        
+        // Make sure the paneId is also set correctly (matching the format used in activeModules)
+        item.i = paneId;
       });
       
       // 2. Create a proper updated layout structure
@@ -118,6 +135,7 @@ export default function LaunchButton({ moduleType, label = null }) {
       // 5. Update active modules in session
       console.log('Updating active modules on server:', updatedModules);
       try {
+        console.log('Updating active modules on server:', updatedModules);
         const moduleResponse = await fetch("/api/user/session/modules", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -139,10 +157,26 @@ export default function LaunchButton({ moduleType, label = null }) {
 
       // 6. Save updated layout to session
       console.log('Saving layout to session:', updatedLayout);
-      const layoutData = await saveLayoutToSession(updatedLayout);
       
-      if (!layoutData) {
-        throw new Error('Failed to save layout to session');
+      try {
+        // Verify if layout has content before saving
+        const hasLayoutItems = Object.values(updatedLayout).some(
+          breakpoint => Array.isArray(breakpoint) && breakpoint.length > 0
+        );
+        
+        if (!hasLayoutItems) {
+          console.warn('Warning: Attempting to save empty layout - no items found in any breakpoint');
+        }
+        
+        const layoutData = await saveLayoutToSession(updatedLayout);
+        console.log('Layout saved to session response:', layoutData);
+        
+        if (!layoutData) {
+          throw new Error('Failed to save layout to session: No data returned');
+        }
+      } catch (layoutError) {
+        console.error('Error saving layout to session:', layoutError);
+        throw new Error(`Failed to save layout to session: ${layoutError.message}`);
       }
       
       // 7. Emit socket event to notify other components
@@ -196,7 +230,7 @@ export default function LaunchButton({ moduleType, label = null }) {
       >
         {isLaunching ? 'Launching...' : 
          isComponentAvailable === false ? 'Unavailable' : 
-         `Launch ${label || moduleType}`}
+         label || 'Launch'}
       </button>
       {error && (
         <div className="text-red-500 text-xs mt-1">{error}</div>

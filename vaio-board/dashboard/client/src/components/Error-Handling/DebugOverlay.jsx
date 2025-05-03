@@ -189,7 +189,18 @@ export default function DebugOverlay() {
   }, [isOpen]);
   
   useEffect(() => {
-    // Reset layout function
+    // Expose the function to toggle the debug overlay to the window object
+    window.toggleDebugOverlay = () => setIsOpen(prev => !prev);
+    
+    // Add event listener for toggling the debug overlay
+    const handleToggleEvent = (event) => {
+      const forced = event.detail?.forced;
+      setIsOpen(prev => forced ? true : !prev);
+    };
+    
+    window.addEventListener('vaio:toggle-debug-overlay', handleToggleEvent);
+    
+    // Reset layout function 
     window.vaioResetLayout = async () => {
       try {
         localStorage.removeItem('vaio_layout');
@@ -208,7 +219,11 @@ export default function DebugOverlay() {
     // Fetch session data initially
     fetchSessionData();
     
-    return () => delete window.vaioResetLayout;
+    return () => {
+      delete window.vaioResetLayout;
+      delete window.toggleDebugOverlay;
+      window.removeEventListener('vaio:toggle-debug-overlay', handleToggleEvent);
+    };
   }, []);
 
   // Track grid layout to pane mapping relationship
@@ -256,7 +271,7 @@ export default function DebugOverlay() {
         moduleKey,
         hasPaneComponent,
         isValidComponent,
-        errorInfo: paneMap[moduleKey]?.error || null
+        error: paneMap[moduleKey]?.error || null // Changed from errorInfo to error to match usage in UI
       };
       
       if (isValidComponent) {
@@ -320,24 +335,24 @@ export default function DebugOverlay() {
     }
   }, [activeModules, gridLayout]);
 
-  useEffect(() => {
-    if (buttonRef.current) return;
+  // useEffect(() => {
+  //   if (buttonRef.current) return;
 
-    const btn = document.createElement('button');
-    btn.innerText = '🔍';
-    btn.id = 'vaio-debug-button';
-    btn.className = 'fixed top-2 right-2 z-[9999] h-8 w-8 rounded-full bg-green-900/80 text-green-300 border border-green-600 flex items-center justify-center hover:bg-green-800';
-    btn.onclick = () => setIsOpen(true);
-    document.body.appendChild(btn);
-    buttonRef.current = btn;
+  //   const btn = document.createElement('button');
+  //   btn.innerText = '🔍';
+  //   btn.id = 'vaio-debug-button';
+  //   btn.className = 'fixed top-2 right-2 z-[9999] h-8 w-8 rounded-full bg-green-900/80 text-green-300 border border-green-600 flex items-center justify-center hover:bg-green-800';
+  //   btn.onclick = () => setIsOpen(true);
+  //   document.body.appendChild(btn);
+  //   buttonRef.current = btn;
 
-    return () => {
-      if (buttonRef.current) {
-        buttonRef.current.remove();
-        buttonRef.current = null;
-      }
-    };
-  }, []);
+  //   return () => {
+  //     if (buttonRef.current) {
+  //       buttonRef.current.remove();
+  //       buttonRef.current = null;
+  //     }
+  //   };
+  // }, []);
 
   // Force re-fetch session data when debug overlay is opened
   useEffect(() => {
@@ -359,60 +374,85 @@ export default function DebugOverlay() {
   if (!isOpen) return null;
   
   return (
-    <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50 font-mono">
-      <div className="bg-black border border-green-700 rounded w-[80%] max-w-4xl h-[80%] overflow-auto p-4 text-green-300 shadow-lg crt-glow">
-        <div className="flex justify-between items-center border-b border-green-700 pb-3 mb-4">
-          <h2 className="text-green-400 text-lg">vAIO Debug Console</h2>
+    <div className="fixed top-0 left-0 w-full h-full bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 font-mono">
+      <div className="glass-notification rounded-lg w-[85%] max-w-5xl h-[85%] overflow-hidden shadow-xl flex flex-col scanlines border border-green-600/5">
+        <div className="flex justify-between items-center px-4 py-2 border-b border-green-600/20">
+          <h2 className="text-green-400 text-lg debug-header">vAIO Debug Console</h2>
           <button
             onClick={() => setIsOpen(false)}
-            className="bg-red-900/40 border border-red-700 rounded px-3 py-1"
+            className="text-xs font-bold cursor-pointer opacity-60 hover:opacity-100 transition-all w-6 h-6 flex items-center justify-center rounded-full hover:bg-green-900/20"
+            title="Close debug overlay"
           >
-            Close
+            ×
           </button>
         </div>
         
         {/* Debug Tabs */}
-        <div className="flex flex-wrap border-b border-green-700 mb-4">
+        <div className="flex flex-wrap border-b border-green-700/30 mb-1 px-4 py-1">
           <button 
             onClick={() => setActiveTab('general')}
-            className={`px-3 py-1 mr-2 mb-2 ${activeTab === 'general' ? 'bg-green-900/40 border-t border-l border-r border-green-700' : 'text-green-500'}`}
+            className={`px-3 py-1.5 mr-1 text-xs transition-all ${
+              activeTab === 'general' 
+                ? 'text-green-300 border-b-2 border-green-500/60' 
+                : 'text-green-500 hover:text-green-400 hover:border-b-2 hover:border-green-500/30'
+            }`}
           >
             General
           </button>
           <button 
             onClick={() => setActiveTab('panes')}
-            className={`px-3 py-1 mr-2 mb-2 ${activeTab === 'panes' ? 'bg-green-900/40 border-t border-l border-r border-green-700' : 'text-green-500'}`}
+            className={`px-3 py-1.5 mr-1 text-xs transition-all ${
+              activeTab === 'panes' 
+                ? 'text-green-300 border-b-2 border-green-500/60' 
+                : 'text-green-500 hover:text-green-400 hover:border-b-2 hover:border-green-500/30'
+            }`}
           >
             Panes
           </button>
           <button 
             onClick={() => setActiveTab('session')}
-            className={`px-3 py-1 mr-2 mb-2 ${activeTab === 'session' ? 'bg-green-900/40 border-t border-l border-r border-green-700' : 'text-green-500'}`}
+            className={`px-3 py-1.5 mr-1 text-xs transition-all ${
+              activeTab === 'session' 
+                ? 'text-green-300 border-b-2 border-green-500/60' 
+                : 'text-green-500 hover:text-green-400 hover:border-b-2 hover:border-green-500/30'
+            }`}
           >
             Session
           </button>
           <button 
             onClick={() => setActiveTab('network')}
-            className={`px-3 py-1 mr-2 mb-2 ${activeTab === 'network' ? 'bg-green-900/40 border-t border-l border-r border-green-700' : 'text-green-500'}`}
+            className={`px-3 py-1.5 mr-1 text-xs transition-all ${
+              activeTab === 'network' 
+                ? 'text-green-300 border-b-2 border-green-500/60' 
+                : 'text-green-500 hover:text-green-400 hover:border-b-2 hover:border-green-500/30'
+            }`}
           >
             Network
           </button>
           <button 
             onClick={() => setActiveTab('storage')}
-            className={`px-3 py-1 mr-2 mb-2 ${activeTab === 'storage' ? 'bg-green-900/40 border-t border-l border-r border-green-700' : 'text-green-500'}`}
+            className={`px-3 py-1.5 mr-1 text-xs transition-all ${
+              activeTab === 'storage' 
+                ? 'text-green-300 border-b-2 border-green-500/60' 
+                : 'text-green-500 hover:text-green-400 hover:border-b-2 hover:border-green-500/30'
+            }`}
           >
             Storage
           </button>
           <button 
             onClick={() => setActiveTab('socket')}
-            className={`px-3 py-1 mr-2 mb-2 ${activeTab === 'socket' ? 'bg-purple-900/40 border-t border-l border-r border-purple-700' : 'text-purple-500'}`}
+            className={`px-3 py-1.5 mr-1 text-xs transition-all ${
+              activeTab === 'socket' 
+                ? 'text-green-300 border-b-2 border-green-500/60' 
+                : 'text-green-500 hover:text-green-400 hover:border-b-2 hover:border-green-500/30'
+            }`}
           >
             Socket
           </button>
         </div>
 
         {/* Tab Content */}
-        <div className="tab-content">
+        <div className="flex-1 overflow-auto p-4">
           {/* General Tab - Original Debug Info */}
           {activeTab === 'general' && (
             <DebugOverlayGeneral
@@ -472,8 +512,8 @@ export default function DebugOverlay() {
           {/* Socket Tab - Socket.io Data Monitoring */}
           {activeTab === 'socket' && (
             <div>
-              <div className="border border-purple-800 rounded p-3">
-                <h3 className="text-purple-400 mb-2">
+              <div className="glass-notification p-4 rounded-md border border-green-600/20 debug-border-glow">
+                <h3 className="text-green-400 mb-3 debug-header border-b border-green-500/20 pb-2">
                   Socket Status: {socketData.connected ? (
                     <span className="text-green-400">✅ Connected</span>
                   ) : (
@@ -483,15 +523,15 @@ export default function DebugOverlay() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-purple-300 text-sm mb-1">
+                    <h4 className="text-green-300 text-xs mb-1">
                       Services ({Array.isArray(socketData.services) ? socketData.services.length : 0})
                     </h4>
-                    <div className="scanlines bg-purple-900/10 p-2 rounded overflow-auto max-h-40 text-xs">
+                    <div className="scanlines bg-green-900/10 p-2 rounded overflow-auto max-h-40 text-xs">
                       {Array.isArray(socketData.services) && socketData.services.length > 0 ? (
                         <ul className="list-disc pl-5">
                           {socketData.services.map((service, idx) => (
                             <li key={idx} className="mb-1">
-                              <span className="text-purple-300">{service.name}</span>
+                              <span className="text-green-300">{service.name}</span>
                               <span className="ml-2">
                                 {service.status ? (
                                   <span className={service.status.toLowerCase().includes('error') 
@@ -516,10 +556,10 @@ export default function DebugOverlay() {
                   </div>
                   
                   <div>
-                    <h4 className="text-purple-300 text-sm mb-1">
+                    <h4 className="text-green-300 text-xs mb-1">
                       Error Logs ({Object.keys(socketData.errorLogs || {}).length})
                     </h4>
-                    <div className="scanlines bg-purple-900/10 p-2 rounded overflow-auto max-h-40 text-xs">
+                    <div className="scanlines bg-green-900/10 p-2 rounded overflow-auto max-h-40 text-xs">
                       {Object.entries(socketData.errorLogs || {}).length > 0 ? (
                         <div>
                           {Object.entries(socketData.errorLogs).map(([service, logs]) => (
@@ -546,15 +586,15 @@ export default function DebugOverlay() {
                 </div>
                 
                 <div className="mt-4">
-                  <h4 className="text-purple-300 text-sm mb-1">
+                  <h4 className="text-green-300 text-xs mb-1">
                     Log Streams ({Object.keys(socketData.logStreams || {}).length})
                   </h4>
-                  <div className="scanlines bg-purple-900/10 p-2 rounded overflow-auto max-h-40 text-xs">
+                  <div className="scanlines bg-green-900/10 p-2 rounded overflow-auto max-h-40 text-xs">
                     {Object.entries(socketData.logStreams || {}).length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {Object.entries(socketData.logStreams).map(([service, logs]) => (
                           <div key={service} className="mb-2">
-                            <h5 className="text-cyan-400">{service}</h5>
+                            <h5 className="text-green-400">{service}</h5>
                             <div className="border border-green-900/30 p-2 bg-black/30 max-h-24 overflow-auto">
                               <pre className="text-green-200 text-[9px]">
                                 {typeof logs === 'string' 

@@ -1,5 +1,5 @@
 // ErrorNotificationSystem.jsx
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
 import { useSocket } from '../Panes/Utility/SocketContext.jsx';
 
 // Create unified context
@@ -149,19 +149,50 @@ function ErrorNotificationDisplay({ messages, errors, onCloseMessage, onCloseErr
 // Individual notification component with effects
 function NotificationItem({ id, message, type, onClose, isError = false }) {
   const [isVisible, setIsVisible] = useState(false);
+  const [showCopyTooltip, setShowCopyTooltip] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const messageRef = useRef(null);
+  
+  // Copy message to clipboard on double click
+  const handleCopyClick = () => {
+    if (showCopyTooltip) {
+      // Copy to clipboard
+      const textToCopy = message?.includes('[CONSOLE ERROR]') 
+        ? message.replace('[CONSOLE ERROR]', '')
+        : message?.includes('[CONSOLE WARNING]') 
+          ? message.replace('[CONSOLE WARNING]', '')
+          : message || '';
+      
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      });
+    } else {
+      setShowCopyTooltip(true);
+      setTimeout(() => setShowCopyTooltip(false), 3000);
+    }
+  };
   
   // Get theme styling based on type
   const getTypeStyles = () => {
+    // Check for console error/warning to apply special styling
+    const isConsoleError = message && message.includes('[CONSOLE ERROR]');
+    const isConsoleWarning = message && message.includes('[CONSOLE WARNING]');
+    
     switch(type) {
       case 'error':
-        return 'bg-red-900/40 border-red-600 text-red-300';
+        return isConsoleError 
+          ? 'border-opacity-70 text-red-200 border-l-2 glass-notification-error' 
+          : 'border-red-600/30 text-red-300 crt-text2';
       case 'warning':
-        return 'bg-yellow-900/40 border-yellow-600 text-yellow-300';
+        return isConsoleWarning
+          ? 'border-opacity-70 text-yellow-200 border-l-2 glass-notification-warning'
+          : 'border-yellow-600/30 text-yellow-300';
       case 'success':
-        return 'bg-green-900/40 border-green-600 text-green-300';
+        return 'border-green-600/40 text-green-300 crt-text3';
       case 'info':
       default:
-        return 'bg-green-900/40 border-green-600 text-green-300';
+        return 'border-green-600/30 text-green-300 crt-text3';
     }
   };
   
@@ -188,17 +219,48 @@ function NotificationItem({ id, message, type, onClose, isError = false }) {
       }`}
     >
       <div 
-        className={`flex items-center justify-between px-4 py-1 rounded 
-                  ${getTypeStyles()} border scanlines 
-                  shadow-lg crt-glow min-w-[300px] max-w-[600px]
-                  ${isError ? 'flash-flicker h-auto min-h-10 py-2' : 'h-10'}`}
+        className={`flex items-center justify-between px-4 py-1 rounded-lg 
+                  ${getTypeStyles()} glass-notification scanlines
+                  shadow-xl min-w-[300px] max-w-[600px]
+                  ${isError ? 'h-auto min-h-10 py-2 border border-red-500/3' : 'h-10 border border-green-500/3'}
+                  transition-all duration-300`}
       >
-        <div className={`flex-1 font-mono text-xs ${isError ? 'whitespace-normal' : 'typing-line overflow-hidden whitespace-nowrap'}`}>
-          {message || (isError ? 'Error' : 'Debug information')}
+        <div 
+          ref={messageRef}
+          onClick={handleCopyClick}
+          className={`flex-1 font-mono text-xs ${isError || message?.includes('[CONSOLE') ? 'whitespace-normal' : 'typing-line overflow-hidden whitespace-nowrap'} cursor-pointer relative`}
+          title="Click to copy"
+        >
+          {showCopyTooltip && (
+            <div className="absolute -top-6 left-0 bg-black/80 text-green-300 text-xs px-2 py-0.5 rounded pointer-events-none z-10">
+              {isCopied ? "Copied!" : "Click again to copy"}
+            </div>
+          )}
+          
+          {message?.includes('[CONSOLE ERROR]') ? (
+            <div>
+              <span className="shadow-glow-sm text-red-300">{message.replace('[CONSOLE ERROR]', '')}</span>
+              <span className="block mt-1 text-2xs opacity-70 flex items-center">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5 shadow-glow-sm shadow-red-500/40 debug-indicator"></span>
+                ERROR LOG // {new Date().toLocaleTimeString()}
+              </span>
+            </div>
+          ) : message?.includes('[CONSOLE WARNING]') ? (
+            <div>
+              <span className="shadow-glow-sm text-yellow-200">{message.replace('[CONSOLE WARNING]', '')}</span>
+              <span className="block mt-1 text-2xs opacity-70 flex items-center">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-yellow-500 mr-1.5 shadow-glow-sm shadow-yellow-500/40 debug-indicator"></span>
+                WARNING LOG // {new Date().toLocaleTimeString()}
+              </span>
+            </div>
+          ) : (
+            message || (isError ? 'Error' : 'Debug information')
+          )}
         </div>
         <button 
           onClick={handleClose}
-          className="text-xs ml-4 hover-cursor opacity-70 hover:opacity-100 crt-text2"
+          className="text-xs ml-4 cursor-pointer opacity-60 hover:opacity-100 transition-all w-5 h-5 flex items-center justify-center rounded-full hover:bg-green-900/10 font-bold"
+          title="Dismiss notification"
         >
           ×
         </button>

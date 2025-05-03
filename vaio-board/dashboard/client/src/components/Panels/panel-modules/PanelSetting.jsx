@@ -1,5 +1,8 @@
 import { useContext } from 'react'
 import { SettingsContext } from '../../SettingsMenu/SettingsContext'
+import ModuleReloadButton from '../../Diagnostics/ModuleReloadButton'
+import SupervisorRegistrationUtil from '../../Diagnostics/SupervisorRegistrationUtil'
+import LayoutDebugUtil from '../../Diagnostics/LayoutDebugUtil'
 
 export default function PanelSetting({ 
   settingsOpen, 
@@ -115,6 +118,18 @@ export default function PanelSetting({
             </div>
           </div>
         )
+      case 'debug-tools':
+        return (
+          <div className="bg-black/70 backdrop-blur-sm p-3">
+            <div className="crt-text4 text-xs">
+              <p>Debug Tools provide:</p>
+              <p className="mt-2">• Module reload capabilities</p>
+              <p className="mt-1">• Supervisor registration utility</p>
+              <p className="mt-1">• Layout debugging tools</p>
+              <p className="mt-1">• Diagnostic functions for troubleshooting</p>
+            </div>
+          </div>
+        )
       default:
         return null
     }
@@ -202,6 +217,37 @@ export default function PanelSetting({
               </button>
             </div>
             {activeExplanation === 'reset-layout' && renderExplanation('reset-layout')}
+          </div>
+
+          <div>
+            <div className="flex items-center">
+              <button 
+                onClick={() => handleExplanationClick('debug-tools')}
+                className="w-6 px-2 py-1 crt-link5"
+              >
+                <span>{activeExplanation === 'debug-tools' ? '▽' : '◁'}</span>
+              </button>
+              <button 
+                className="flex-grow px-2 py-1 text-right crt-link5 text-lg text-blue-400"
+                onClick={() => handleExplanationClick('debug-tools')}
+              >
+                [🛠] DEBUG TOOLS
+              </button>
+            </div>
+            {activeExplanation === 'debug-tools' && (
+              <div className="bg-black/70 backdrop-blur-sm p-3">
+                <div className="crt-text4 text-xs space-y-3">
+                  <div>
+                    <h3 className="font-bold mb-1">Module Operations</h3>
+                    <ModuleReloadButton />
+                  </div>
+                  
+                  <SupervisorRegistrationUtil />
+                  
+                  <LayoutDebugUtil />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 import { useContext } from 'react'
 import { SettingsContext } from '../../../SettingsMenu/SettingsContext.jsx'
 import { useSocket } from '../../../Panes/Utility/SocketContext.jsx'
-import LaunchButton from './LaunchButton.jsx'
+import LaunchButtonSuper from '../Launchers/LaunchButtonSuper.jsx'
 import { saveLayoutToSession } from './LayoutManager.js'
 import { componentRegistry } from './ComponentRegistry.js'
 
@@ -85,7 +85,7 @@ export default function ModulePaneToggle({ slug, label = null }) {
           Remove {label || slug}
         </button>
       ) : (
-        <LaunchButton moduleType={slug} label={label} />
+        <LaunchButtonSuper moduleType={slug} label={label} />
       )}
     </div>
   )

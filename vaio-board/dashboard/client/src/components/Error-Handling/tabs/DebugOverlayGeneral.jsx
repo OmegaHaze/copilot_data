@@ -14,61 +14,72 @@ export default function DebugOverlayGeneral({
   return (
     <div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="border border-green-800 rounded p-3">
-          <h3 className="text-green-400 mb-2">Active Modules ({Array.isArray(activeModules) ? activeModules.length : 0})</h3>
-          <div className="scanlines bg-green-900/10 p-2 rounded">
+        <div className="glass-notification p-4 rounded-md border border-green-600/20 debug-border-glow">
+          <h3 className="text-green-400 mb-3 debug-header border-b border-green-500/20 pb-2">Active Modules ({Array.isArray(activeModules) ? activeModules.length : 0})</h3>
+          <div className="scanlines bg-black/30 p-3 rounded-md">
             {Array.isArray(activeModules) && activeModules.length > 0 ? (
-              <ul>
+              <ul className="space-y-1 text-xs">
                 {activeModules.map(mod => (
-                  <li key={mod} className={mod === 'supervisor'  ? 'text-yellow-400' : ''}>
+                  <li key={mod} className={`${mod === 'supervisor' ? 'text-yellow-300' : 'text-green-300'} px-3 py-1.5 rounded hover:bg-green-900/20 transition-all debug-item-hover`}>
                     {mod} {(mod === 'supervisor') && '⭐'}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-red-400">No active modules found.</p>
+              <p className="text-red-400 flex items-center">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5 shadow-glow-sm shadow-red-500/40 debug-indicator"></span>
+                No active modules found.
+              </p>
             )}
           </div>
         </div>
 
-        <div className="border border-green-800 rounded p-3">
-          <h3 className="text-green-400 mb-2">Supervisor Status</h3>
-          <div className="scanlines bg-green-900/10 p-2 rounded">
-            <div className="flex items-center gap-2">
-              <span className={`h-3 w-3 rounded-full ${hasSupervisor ? 'bg-green-500 flash-flicker' : 'bg-red-500'}`}></span>
-              <span>{hasSupervisor ? 'Active in modules list' : 'Not in active modules'}</span>
+        <div className="glass-notification p-4 rounded-md border border-green-600/20 debug-border-glow">
+          <h3 className="text-green-400 mb-3 debug-header border-b border-green-500/20 pb-2">Supervisor Status</h3>
+          <div className="scanlines bg-black/30 p-3 rounded-md">
+            <div className="flex items-center gap-2 p-1 rounded transition-colors">
+              <span className={`h-3 w-3 rounded-full ${
+                hasSupervisor 
+                  ? 'bg-green-500 shadow-glow-sm shadow-green-500/40 debug-indicator' 
+                  : 'bg-red-500 debug-indicator'
+              }`}></span>
+              <span className="text-xs">{hasSupervisor ? 'Active in modules list' : 'Not in active modules'}</span>
             </div>
-            <div className="flex items-center gap-2 mt-2">
-              <span className={`h-3 w-3 rounded-full ${supervisorLayout ? 'bg-green-500 flash-flicker' : 'bg-red-500'}`}></span>
-              <span>{supervisorLayout ? 'Has layout data' : 'No layout data'}</span>
+            <div className="flex items-center gap-2 mt-2 p-1 rounded transition-colors">
+              <span className={`h-3 w-3 rounded-full ${
+                supervisorLayout 
+                  ? 'bg-green-500 shadow-glow-sm shadow-green-500/40 debug-indicator' 
+                  : 'bg-red-500 debug-indicator'
+              }`}></span>
+              <span className="text-xs">{supervisorLayout ? 'Has layout data' : 'No layout data'}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mt-4 border border-green-800 rounded p-3">
-        <h3 className="text-green-400 mb-2">Grid Layout Data</h3>
-        <div className="scanlines bg-green-900/10 p-2 rounded overflow-auto max-h-60">
-          <pre className="text-xs">{JSON.stringify(gridLayout, null, 2)}</pre>
+      <div className="mt-4 debug-glass-panel p-4 rounded-lg">
+        <h3 className="text-green-400 mb-2 debug-header border-b border-green-500/20 pb-1">Grid Layout Data</h3>
+        <div className="scanlines bg-black/20 p-3 rounded-md overflow-auto max-h-60">
+          <pre className="text-xs text-green-300">{JSON.stringify(gridLayout, null, 2)}</pre>
         </div>
       </div>
 
       {supervisorLayout && (
-        <div className="mt-4 border border-green-800 rounded p-3">
-          <h3 className="text-green-400 mb-2">Supervisor Layout Details</h3>
-          <div className="scanlines bg-green-900/10 p-2 rounded">
+        <div className="mt-4 debug-glass-panel p-4 rounded-lg">
+          <h3 className="text-green-400 mb-2 debug-header border-b border-green-500/20 pb-1">Supervisor Layout Details</h3>
+          <div className="scanlines bg-black/20 p-3 rounded-md">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-green-700">
-                  <th className="text-left p-1">Property</th>
-                  <th className="text-left p-1">Value</th>
+                <tr className="border-b border-green-700/30">
+                  <th className="text-left p-1 text-green-400">Property</th>
+                  <th className="text-left p-1 text-green-400">Value</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(supervisorLayout).map(([key, value]) => (
-                  <tr key={key} className="border-b border-green-900">
-                    <td className="p-1 text-green-200">{key}</td>
-                    <td className="p-1">{typeof value === 'object' ? JSON.stringify(value) : value}</td>
+                  <tr key={key} className="border-b border-green-900/20 hover:bg-green-900/10">
+                    <td className="p-1.5 text-green-300">{key}</td>
+                    <td className="p-1.5 text-green-200">{typeof value === 'object' ? JSON.stringify(value) : value}</td>
                   </tr>
                 ))}
               </tbody>
@@ -77,16 +88,24 @@ export default function DebugOverlayGeneral({
         </div>
       )}
 
-      <div className="mt-4">
-        <h3 className="text-green-400 mb-2">Recommended Actions:</h3>
-        <div className="scanlines bg-green-900/10 p-2 rounded">
-          <ul className="list-disc pl-5">
-            {!hasSupervisor && <li className="text-red-300">Add 'supervisor' to active modules</li>}
+      <div className="mt-4 glass-notification rounded-md p-3">
+        <h3 className="text-green-400 mb-2 crt-text3 border-b border-green-500/20 pb-1">Recommended Actions</h3>
+        <div className="scanlines bg-black/20 p-2 rounded">
+          <ul className="space-y-2 text-xs">
+            {!hasSupervisor && 
+              <li className="flex items-center p-1.5 rounded bg-red-900/10 border border-red-500/30">
+                <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-2 shadow-glow-sm shadow-red-500/40"></span>
+                <span className="text-red-300">Add 'supervisor' to active modules</span>
+              </li>
+            }
             {hasSupervisor && !supervisorLayout && (
-              <li className="text-red-300">
-                Supervisor is active but missing layout data. Try:
+              <li className="flex items-center justify-between p-1.5 rounded bg-red-900/10 border border-red-500/30">
+                <div className="flex items-center">
+                  <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-2 shadow-glow-sm shadow-red-500/40"></span>
+                  <span className="text-red-300">Supervisor is active but missing layout data</span>
+                </div>
                 <button
-                  className="ml-2 bg-blue-900/40 border border-blue-700 rounded px-2 py-0.5 text-xs"
+                  className="ml-2 glass-notification border border-blue-500/30 text-blue-300 rounded px-2 py-0.5 text-xs hover:bg-blue-900/20 transition-colors"
                   onClick={() => {
                     if (typeof window.vaioResetLayout === 'function') {
                       window.vaioResetLayout();
@@ -100,11 +119,14 @@ export default function DebugOverlayGeneral({
               </li>
             )}
             {supervisorLayout && !supervisorLayout.i && (
-              <li className="text-yellow-300">Supervisor layout is missing required 'i' property</li>
+              <li className="flex items-center p-1.5 rounded bg-yellow-900/10 border border-yellow-500/30">
+                <span className="inline-block w-2 h-2 rounded-full bg-yellow-500 mr-2 shadow-glow-sm shadow-yellow-500/40"></span>
+                <span className="text-yellow-300">Supervisor layout is missing required 'i' property</span>
+              </li>
             )}
-            <li className="text-cyan-300 mt-2">
+            <li className="flex justify-end mt-2">
               <button
-                className="bg-blue-900/40 border border-blue-700 rounded px-2 py-0.5 text-xs"
+                className="glass-notification border border-green-500/30 text-green-300 rounded px-3 py-1 text-xs hover:bg-green-900/20 transition-colors"
                 onClick={fetchSessionData}
               >
                 Refresh Session Data

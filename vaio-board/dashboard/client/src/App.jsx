@@ -1,14 +1,21 @@
 // Updated App.jsx
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import ServiceMatrix from './components/Panes/Utility/Loader/ServiceMatrix.jsx';
 import BootFlicker from './components/Boot/BootFlicker.jsx';
 import SetAdmin from './components/Admin/SetAdmin.jsx';
 import Login from './components/Admin/Login.jsx';
 import BootShell from './components/Boot/BootShell.jsx';
 
+// Import diagnostic tools
+import ModuleChecker from './components/Diagnostics/ModuleChecker.jsx';
+
+// Import error test button
+import ErrorTestButton from './components/Error-Handling/ErrorTestButton.jsx';
+
 import { SettingsProvider } from './components/SettingsMenu/SettingsContext.jsx';
 import { DragDisableProvider } from './components/Panes/Utility/DragDisableContext.jsx';
 import { SocketProvider } from './components/Panes/Utility/SocketContext.jsx';
+import { EnvSocketProvider } from './components/Panes/Utility/EnvSocketContext.jsx';
 import PaneHeaderSettings from './components/Panes/Utility/MainSettings.jsx';
 import { ErrorProvider, useErrorSystem } from './components/Error-Handling/ErrorNotificationSystem.jsx';
 import DebugOverlay from './components/Error-Handling/DebugOverlay.jsx';
@@ -71,6 +78,14 @@ function AppContent() {
           <ServiceMatrix />
           <PaneHeaderSettings />
           <DebugOverlay />
+          {/* Run module diagnostic on load */}
+          <ModuleChecker />
+          {import.meta.env.DEV && (
+            // Only include test button in development
+            <Suspense fallback={<></>}>
+              <TestErrorButton />
+            </Suspense>
+          )}
         </>
       )}
 
@@ -96,14 +111,16 @@ function AppContent() {
 // Main App export
 export default function App() {
   return (
-    <SocketProvider>
-      <ErrorProvider>
-        <DragDisableProvider>
-          <SettingsProvider>
-            <AppWithErrorSystem />
-          </SettingsProvider>
-        </DragDisableProvider>
-      </ErrorProvider>
-    </SocketProvider>
+    <EnvSocketProvider>
+      <SocketProvider>
+        <ErrorProvider>
+          <DragDisableProvider>
+            <SettingsProvider>
+              <AppWithErrorSystem />
+            </SettingsProvider>
+          </DragDisableProvider>
+        </ErrorProvider>
+      </SocketProvider>
+    </EnvSocketProvider>
   );
 }

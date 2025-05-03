@@ -6,6 +6,13 @@ export default defineConfig({
   root: path.resolve(__dirname),
   plugins: [react()],
   base: './',
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+      '@components': path.resolve(__dirname, 'src/components'),
+      'Pane': path.resolve(__dirname, 'src/components/Panes/Utility/Pane')
+    }
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
@@ -27,7 +34,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:1888',
+      '/api': 'http://localhost:1888'
     },
     force: true,
     hmr: {

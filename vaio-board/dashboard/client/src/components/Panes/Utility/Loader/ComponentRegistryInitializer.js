@@ -9,16 +9,49 @@ export async function initializeComponentRegistry() {
     console.log('Initializing component registry...');
     
     // Fetch all modules from the API in parallel
-    const [systemRes, serviceRes, userRes] = await Promise.all([
-      fetch('/api/modules?module_type=system'),
-      fetch('/api/modules?module_type=service'),
-      fetch('/api/modules?module_type=user')
-    ]);
+    let systemRes, serviceRes, userRes;
     
-    // Parse responses
-    const system = await systemRes.json();
-    const service = await serviceRes.json();
-    const user = await userRes.json();
+    try {
+      [systemRes, serviceRes, userRes] = await Promise.all([
+        fetch('/api/modules?module_type=system'),
+        fetch('/api/modules?module_type=service'),
+        fetch('/api/modules?module_type=user')
+      ]);
+      
+      // Check for HTTP errors
+      if (!systemRes.ok) console.error(`Failed to fetch system modules: ${systemRes.status}`);
+      if (!serviceRes.ok) console.error(`Failed to fetch service modules: ${serviceRes.status}`);
+      if (!userRes.ok) console.error(`Failed to fetch user modules: ${userRes.status}`);
+      
+    } catch (fetchErr) {
+      console.error('Network error fetching modules:', fetchErr);
+      
+      // Create empty responses as fallback
+      systemRes = { ok: true, json: async () => [] };
+      serviceRes = { ok: true, json: async () => [] };
+      userRes = { ok: true, json: async () => [] };
+    }
+    
+    // Parse responses with error handling
+    let system = [], service = [], user = [];
+    
+    try {
+      system = systemRes.ok ? await systemRes.json() : [];
+    } catch (e) {
+      console.error('Failed to parse system modules:', e);
+    }
+    
+    try {
+      service = serviceRes.ok ? await serviceRes.json() : [];
+    } catch (e) {
+      console.error('Failed to parse service modules:', e);
+    }
+    
+    try {
+      user = userRes.ok ? await userRes.json() : [];
+    } catch (e) {
+      console.error('Failed to parse user modules:', e);
+    }
     
     // Combine all modules and store in registry
     const allModules = [...system, ...service, ...user];
@@ -28,7 +61,13 @@ export async function initializeComponentRegistry() {
     
     // Process each module for component loading
     const loadPromises = [];
+    const loadDetails = [];
     
+    if (allModules.length === 0) {
+      console.warn('No modules found in API responses. Please check the backend is returning module data correctly.');
+    }
+    
+    // Load components from the API response
     for (const mod of allModules) {
       // Get canonical key
       const key = componentRegistry.getCanonicalKey(mod.module || mod.name);
@@ -46,20 +85,52 @@ export async function initializeComponentRegistry() {
       // Load component if specified
       if (mod.paneComponent) {
         loadPromises.push(componentRegistry.loadComponent(key, mod.paneComponent));
+        loadDetails.push({ key, component: mod.paneComponent, source: 'api' });
       } else {
         // Try to load using conventional naming
+        const conventionalName = componentRegistry.getComponentName(key);
         loadPromises.push(componentRegistry.loadComponent(key));
+        loadDetails.push({ key, component: conventionalName, source: 'convention' });
       }
     }
+    
+    console.log('Component load queue:', loadDetails.map(d => `${d.key} (${d.component}) [${d.source}]`).join(', '));
     
     // Wait for all components to load
     const results = await Promise.allSettled(loadPromises);
     
-    // Count successes and failures
-    const successes = results.filter(r => r.status === 'fulfilled' && r.value).length;
-    const failures = results.filter(r => r.status === 'rejected' || !r.value).length;
+    // Count successes and failures with detailed reporting
+    const succeededComponents = [];
+    const failedComponents = [];
     
-    console.log(`Loaded ${successes} components successfully (${failures} failed)`);
+    results.forEach((result, index) => {
+      const detail = loadDetails[index];
+      if (result.status === 'fulfilled' && result.value) {
+        succeededComponents.push(detail);
+      } else {
+        failedComponents.push({
+          ...detail,
+          error: result.reason?.message || 'Component loading failed'
+        });
+      }
+    });
+    
+    // Detailed logging of results
+    console.log(`Loaded ${succeededComponents.length} components successfully:`);
+    if (succeededComponents.length > 0) {
+      console.log(succeededComponents.map(c => `- ${c.key} (${c.component})`).join('\n'));
+    }
+    
+    if (failedComponents.length > 0) {
+      console.error(`Failed to load ${failedComponents.length} components:`);
+      console.error(failedComponents.map(c => `- ${c.key} (${c.component}): ${c.error}`).join('\n'));
+    }
+    
+    // If no components were loaded, just log a warning
+    if (succeededComponents.length === 0 && componentRegistry.getAllComponentKeys().length === 0) {
+      console.warn('NO COMPONENTS LOADED! Please check API responses and component imports.');
+    }
+    
     componentRegistry.setInitialized(true);
     
     // Register debug helpers in development mode
@@ -67,13 +138,24 @@ export async function initializeComponentRegistry() {
       registerDebugHelpers();
     }
     
+    // Create helpful error message if needed
+    let errorMessage = null;
+    if (succeededComponents.length === 0) {
+      errorMessage = 'Failed to load any components. Check network connectivity and browser console.';
+    } else if (failedComponents.length > 0) {
+      errorMessage = `${failedComponents.length} components failed to load. Check browser console for details.`;
+    }
+    
     return {
-      success: true,
+      success: succeededComponents.length > 0,
       componentCount: componentRegistry.getAllComponentKeys().length,
       errors: componentRegistry.getErrors(),
+      errorMessage,
       paneMap: getPaneMap(),
       logoUrls: getLogoMap(),
-      moduleData: componentRegistry.getModuleData()
+      moduleData: componentRegistry.getModuleData(),
+      loadedComponents: succeededComponents.map(c => c.key),
+      failedComponents: failedComponents.map(c => c.key)
     };
   } catch (err) {
     console.error('Failed to initialize component registry:', err);

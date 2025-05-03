@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import HeaderAscii from '../Boot/HeaderAscii.jsx'
 import { useSocket } from '../Panes/Utility/SocketContext'
-import ModulePaneToggle from '../Panes/Utility/Loader/ModulePaneToggle.jsx'
+import LaunchButtonSuper from '../Panes/Utility/Launchers/LaunchButtonSuper.jsx'
+import LaunchButtonNvidia from '../Panes/Utility/Launchers/LaunchButtonNvidia.jsx'
+import DebugOverlayTestButton from '../Error-Handling/DebugOverlayTestButton.jsx'
 
 
 
@@ -12,7 +14,6 @@ export default function SidePanelLeft({ show, toggle }) {
   const panelWidth = isMobile ? '100vw' : `${width}px`
   const [modulesOpen, setModulesOpen] = useState(false)
   const [activeModule, setActiveModule] = useState(null)
-  const [showPaneCreator, setShowPaneCreator] = useState(false)
   const { services } = useSocket()
   const [systemStatus, setSystemStatus] = useState({ allNominal: true, notRunning: [] })
   const [tabIcon, setTabIcon] = useState('☰')
@@ -296,8 +297,30 @@ export default function SidePanelLeft({ show, toggle }) {
         </button>
          {activeModule === 'pane' && (
              <div className="px-2 py-1">
-              <ModulePaneToggle slug="supervisor" label="Supervisor Pane" />
-              <ModulePaneToggle slug="nvidia" label="NVIDIA GPU Pane" />
+              {/* Use specialized launch buttons for each pane type */}
+              <div className="flex flex-col space-y-2">
+                <div className="flex items-center crt-link5 p-1 rounded">
+                  <div className="w-10 h-10 mr-2 flex items-center justify-center crt-border6 rounded">
+                    <span className="crt-text4">SUP</span>
+                  </div>
+                  <div className="flex-grow">
+                    <div className="text-xs mb-1">SUPERVISOR PANE</div>
+                    <div className="text-xs opacity-70">System monitoring and process control</div>
+                  </div>
+                  <LaunchButtonSuper moduleType="supervisor" label="Launch" />
+                </div>
+                
+                <div className="flex items-center crt-link5 p-1 rounded">
+                  <div className="w-10 h-10 mr-2 flex items-center justify-center crt-border6 rounded">
+                    <span className="crt-text4">GPU</span>
+                  </div>
+                  <div className="flex-grow">
+                    <div className="text-xs mb-1">NVIDIA GPU PANE</div>
+                    <div className="text-xs opacity-70">GPU metrics and performance data</div>
+                  </div>
+                  <LaunchButtonNvidia moduleType="nvidia" label="Launch" />
+                </div>
+              </div>
               
               {/* Layout Cleaning Button - styled to match your UI */}
               <div className="mt-3 border-t border-green-800/30 pt-2">
@@ -382,6 +405,17 @@ export default function SidePanelLeft({ show, toggle }) {
                   </div>
                   <span className="text-xs">RESET LAYOUT (NUCLEAR OPTION)</span>
                 </button>
+              </div>
+
+              {/* Debug Overlay Button */}
+              <div className="mt-3 border-t border-green-800/30 pt-2">
+                <div className="flex items-center w-full p-1 rounded hover:bg-green-900/20">
+                  <div className="w-8 h-8 mr-2 flex items-center justify-center crt-border6 rounded">
+                    <span className="crt-text4">⚙️</span>
+                  </div>
+                  <span className="text-xs flex-grow">DEBUG OVERLAY</span>
+                  <DebugOverlayTestButton />
+                </div>
               </div>
 
                       </div>

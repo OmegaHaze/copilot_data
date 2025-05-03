@@ -50,16 +50,23 @@ class ComponentRegistry {
     try {
       // Create component name using convention if not provided
       const compName = componentName || this.getComponentName(key);
-      const importPath = `../Pane/${compName}.jsx`;
+      // Create the import path using the alias defined in vite.config.js
+      const importPath = `Pane/${compName}.jsx`;
       
       // Create and store loading promise
-      const loadPromise = import(importPath)
+      const loadPromise = import(/* @vite-ignore */ importPath).catch(err => {
+        console.log(`Failed to load from path ${importPath}`);
+        return import(`../Pane/${compName}.jsx`).catch(err2 => {
+          console.log(`Also failed to load from fallback path ../Pane/${compName}.jsx`);
+          return null;
+        });
+      })
         .then(module => {
-          if (module.default) {
+          if (module && module.default) {
             this.components.set(key, module.default);
             return module.default;
           }
-          throw new Error(`No default export in ${importPath}`);
+          throw new Error(`No default export in ${importPath} or module was null`);
         })
         .catch(err => {
           this.errors.set(key, {

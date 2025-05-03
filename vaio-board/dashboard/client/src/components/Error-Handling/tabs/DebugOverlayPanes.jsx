@@ -15,19 +15,19 @@ export default function DebugOverlayPanes({
   return (
     <div>
       {missingPanes.length > 0 && (
-        <div className="mt-4 border border-red-700 rounded p-3">
-          <h3 className="text-red-400 mb-2">❌ Missing Pane Components</h3>
+        <div className="mt-4 glass-notification border border-red-700/30 rounded-md p-4 error-border-pulse">
+          <h3 className="text-red-400 mb-3 border-b border-red-500/20 pb-2 shadow-glow-sm shadow-red-500/20">❌ Missing Pane Components</h3>
           <ul className="list-disc list-inside text-red-300 text-sm">
             {missingPanes.map(key => (
-              <li key={key}>{key}</li>
+              <li key={key} className="py-0.5">{key}</li>
             ))}
           </ul>
         </div>
       )}
 
-      <div className="mt-4 border border-red-800 rounded p-3">
-        <h3 className="text-red-400 mb-2">❌ Missing Pane Mappings</h3>
-        <div className="scanlines bg-red-900/10 p-2 rounded text-red-300 text-xs">
+      <div className="mt-4 glass-notification border border-red-800/30 rounded-md p-4 error-border-pulse">
+        <h3 className="text-red-400 mb-3 border-b border-red-500/20 pb-2 shadow-glow-sm shadow-red-500/20">❌ Missing Pane Mappings</h3>
+        <div className="scanlines bg-red-900/10 p-3 rounded-md text-red-300 text-xs">
           {typeof window.getPaneMapErrors === 'function' ? (
             (() => {
               const missing = window.getPaneMapErrors();
@@ -92,11 +92,11 @@ export default function DebugOverlayPanes({
       </div>
       
       {/* RAW PANE MAP - EXACTLY WHAT YOU ASKED FOR */}
-      <div className="mt-4 border border-red-800 rounded p-3">
-        <h3 className="text-red-400 mb-2">🔥 RAW PANE MAP DUMP</h3>
-        <div className="scanlines bg-red-900/10 p-2 rounded text-xs">
+      <div className="mt-4 glass-notification border border-red-800/30 rounded-md p-4">
+        <h3 className="text-red-400 mb-3 border-b border-red-500/20 pb-2">🔥 RAW PANE MAP DUMP</h3>
+        <div className="scanlines bg-red-900/10 p-3 rounded-md text-xs">
           <button
-            className="bg-red-900/40 border border-red-700 rounded px-2 py-0.5 text-xs mb-2"
+            className="glass-notification border border-red-700/40 rounded px-3 py-1 text-xs mb-3 debug-item-hover shadow-glow-sm text-red-300"
             onClick={() => {
               console.log('Raw Pane Map:', window.getPaneMap ? window.getPaneMap() : 'Not available');
             }}
@@ -111,9 +111,9 @@ export default function DebugOverlayPanes({
       </div>
       
       {/* Grid Pane Rendering Analysis - THIS IS THE KEY SECTION FOR DEBUGGING */}
-      <div className="mt-4 border border-blue-800 rounded p-3">
-        <h3 className="text-blue-400 mb-2">🔍 Grid-Pane Rendering Analysis</h3>
-        <div className="scanlines bg-blue-900/10 p-2 rounded text-xs">                  
+      <div className="mt-4 glass-notification border border-blue-800/30 rounded-md p-4">
+        <h3 className="text-blue-400 mb-3 border-b border-blue-500/20 pb-2 debug-header">🔍 Grid-Pane Rendering Analysis</h3>
+        <div className="scanlines bg-blue-900/10 p-3 rounded-md text-xs">                  
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
             <div>
               <h4 className="text-blue-300 mb-1">✅ Grid Items That Can Render</h4>
@@ -173,7 +173,7 @@ export default function DebugOverlayPanes({
           
           <div className="mt-3 border-t border-blue-700 pt-2">
             <button
-              className="bg-blue-900/40 border border-blue-700 rounded px-2 py-0.5 text-xs"
+              className="glass-notification border border-blue-700/40 rounded px-3 py-1 text-xs debug-item-hover shadow-glow-sm text-blue-300"
               onClick={analyzeGridPaneMapping}
             >
               Re-Analyze Grid-Pane Connections
@@ -183,8 +183,8 @@ export default function DebugOverlayPanes({
       </div>
       
       {moduleInitData && (
-        <div className="mt-4 border border-green-800 rounded p-3">
-          <h3 className="text-green-400 mb-2">Module Initialization Data</h3>
+        <div className="mt-4 glass-notification border border-green-600/20 rounded-md p-4 debug-border-glow">
+          <h3 className="text-green-400 mb-3 debug-header border-b border-green-500/20 pb-2">Module Initialization Data</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <h4 className="text-green-300 text-sm mb-1">System Modules</h4>

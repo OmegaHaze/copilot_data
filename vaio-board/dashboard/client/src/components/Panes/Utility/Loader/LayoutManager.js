@@ -57,20 +57,93 @@ export function saveLayoutToLocal(layout) {
  */
 export async function saveLayoutToSession(layout) {
   try {
+    // Detailed validation before sending
+    if (!layout) {
+      console.error('saveLayoutToSession: Layout is null or undefined');
+      return null;
+    }
+    
+    // Verify layout has at least one breakpoint defined
+    const hasAnyBreakpoint = BREAKPOINTS.some(bp => 
+      layout[bp] && Array.isArray(layout[bp])
+    );
+    
+    if (!hasAnyBreakpoint) {
+      console.error('saveLayoutToSession: No valid breakpoints found in layout', layout);
+      
+      // Create a minimal valid layout as fallback
+      console.log('Creating minimal fallback layout');
+      const minimalLayout = {};
+      BREAKPOINTS.forEach(bp => {
+        minimalLayout[bp] = [];
+      });
+      
+      // Use this minimal layout instead
+      layout = minimalLayout;
+    }
+    
+    // Sanitize layout for storage
     const safe = sanitizeLayoutForStorage(layout);
-    const res = await fetch('/api/user/session/grid', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(safe)
-    });
     
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // Detailed logging for troubleshooting
+    console.log('Saving layout to session - sanitized layout:', JSON.stringify(safe));
     
-    const data = await res.json();
-    console.log('Synced layout to session');
-    return data;
+    // Make API call with retry logic
+    let attempt = 0;
+    const maxAttempts = 3;
+    
+    while (attempt < maxAttempts) {
+      attempt++;
+      
+      try {
+        const res = await fetch('/api/user/session/grid', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(safe)
+        });
+        
+        // Handle HTTP errors
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error(`HTTP ${res.status}: ${errorText}`);
+          
+          if (attempt < maxAttempts) {
+            console.log(`Retrying layout save (attempt ${attempt + 1}/${maxAttempts})...`);
+            await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+            continue;
+          }
+          
+          throw new Error(`Server error: HTTP ${res.status}`);
+        }
+        
+        // Parse response
+        const data = await res.json();
+        console.log('Layout successfully synced to session:', data);
+        return data;
+      } catch (fetchErr) {
+        if (attempt < maxAttempts) {
+          console.log(`Network error, retrying (${attempt + 1}/${maxAttempts})...`);
+          await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+        } else {
+          throw fetchErr; // Re-throw on final attempt
+        }
+      }
+    }
+    
+    throw new Error('Failed after maximum retry attempts');
   } catch (err) {
     console.error('Failed to sync layout to session:', err);
+    
+    // Show error in notification system if available
+    if (window.errorSystem && typeof window.errorSystem.showError === 'function') {
+      window.errorSystem.showError(
+        `Failed to save layout: ${err.message}`, 
+        'error',
+        10000
+      );
+    }
+    
     return null;
   }
 }
@@ -295,19 +368,36 @@ export function sanitizeLayoutForStorage(layout) {
   // Normalize the layout to ensure proper structure
   const normalized = normalizeLayout(layout);
   
+  // Double-check to see if normalization resulted in an empty layout
+  const isEmpty = Object.values(normalized).every(items => 
+    !Array.isArray(items) || items.length === 0
+  );
+  
+  if (isEmpty) {
+    console.warn('Warning: sanitizeLayoutForStorage received empty layout or normalization removed all items');
+    console.log('Original layout:', layout);
+    console.log('Normalized layout:', normalized);
+  }
+  
   // Remove any internal metadata properties that shouldn't be stored
   BREAKPOINTS.forEach(bp => {
     if (normalized[bp]) {
       normalized[bp] = normalized[bp].map(item => {
+        // Skip invalid items to prevent errors
+        if (!item || typeof item !== 'object') {
+          console.warn(`Invalid layout item in ${bp} breakpoint:`, item);
+          return null;
+        }
+        
         // Create a clean copy of the item
         const cleanItem = {
-          i: item.i,
-          x: item.x,
-          y: item.y,
-          w: item.w,
-          h: item.h,
-          minW: item.minW,
-          minH: item.minH
+          i: item.i || `unknown-${Date.now()}`, // Ensure i is always present
+          x: typeof item.x === 'number' ? item.x : 0,
+          y: typeof item.y === 'number' ? item.y : 0,
+          w: typeof item.w === 'number' ? item.w : 12,
+          h: typeof item.h === 'number' ? item.h : 8,
+          minW: typeof item.minW === 'number' ? item.minW : 3,
+          minH: typeof item.minH === 'number' ? item.minH : 3
         };
         
         // Add optional properties if they exist
@@ -316,7 +406,7 @@ export function sanitizeLayoutForStorage(layout) {
         if (item.static !== undefined) cleanItem.static = item.static;
         
         return cleanItem;
-      });
+      }).filter(Boolean); // Filter out nulls from invalid items
     }
   });
 

@@ -52,6 +52,16 @@ export default function ServiceGrid({
   activeModules = []
 }) {
   const { isDragDisabled } = useDragDisable();
+  
+  // Validate that layout has at least some valid breakpoints
+  const hasValidLayout = useMemo(() => {
+    // Check if any breakpoint has layout items
+    if (!layout) return false;
+    
+    return Object.keys(layout).some(bp => 
+      Array.isArray(layout[bp]) && layout[bp].length > 0
+    );
+  }, [layout]);
 
   // Get canonical key for a module/service item using the registry
   const getModuleKey = useCallback((item) => {
@@ -70,38 +80,7 @@ export default function ServiceGrid({
   }, []);
 
   /**
-   * Render a single pane component with proper error handling
-   */
-  const renderPane = useCallback((key, props, Component, className) => {
-    if (!Component || typeof Component !== 'function') {
-      console.warn(`Invalid component for ${key}, using DefaultPane`);
-      return renderDefaultPane(key, props, className);
-    }
-
-    return (
-      <div key={props._gridId || key} className={className}>
-        <ErrorBoundary componentName={`Pane:${key}`}>
-          <Component {...props} />
-        </ErrorBoundary>
-      </div>
-    );
-  }, []);
-  
-  /**
-   * Render a fallback default pane when component not found
-   */
-  const renderDefaultPane = useCallback((key, props, className) => {
-    return (
-      <div key={props._gridId || key} className={className}>
-        <ErrorBoundary componentName={`DefaultPane:${key}`}>
-          <DefaultPane {...props} slug={key} />
-        </ErrorBoundary>
-      </div>
-    );
-  }, []);
-
-  /**
-   * Add pane to rendered items
+   * Add pane to rendered items - improved version with simplified logic
    */
   const addPane = useCallback((item, type, panes) => {
     // Skip invalid items
@@ -116,9 +95,6 @@ export default function ServiceGrid({
       console.warn('Cannot determine module key for item:', item);
       return;
     }
-    
-    // Get the component from paneMap
-    const Component = paneMap[moduleKey];
     
     // Get styling based on module type
     const logo = item.logoUrl || logoUrls[moduleKey];
@@ -141,14 +117,21 @@ export default function ServiceGrid({
       moduleType
     };
 
-    // Check if component exists and render appropriate pane
-    if (!Component) {
-      console.warn(`Component not found for ${moduleKey}.`);
-      panes.push(renderDefaultPane(moduleKey, props, className));
-    } else {
-      panes.push(renderPane(moduleKey, props, Component, className));
-    }
-  }, [getModuleKey, paneMap, logoUrls, renderPane, renderDefaultPane]);
+    // Get the component from paneMap
+    const Component = paneMap[moduleKey];
+    
+    // Use the same div wrapper regardless of component presence
+    panes.push(
+      <div key={props._gridId || moduleKey} className={className}>
+        <ErrorBoundary componentName={`Pane:${moduleKey}`}>
+          {Component && typeof Component === 'function' ? 
+            <Component {...props} /> : 
+            <DefaultPane {...props} slug={moduleKey} />
+          }
+        </ErrorBoundary>
+      </div>
+    );
+  }, [getModuleKey, paneMap, logoUrls]);
 
   /**
    * Render all panes based on services, layout items and modules
@@ -217,26 +200,86 @@ export default function ServiceGrid({
     return validatedLayout;
   }, [layout]);
   
+  // Check if we have any active modules but no valid layout items
+  const hasActiveModulesButNoLayout = 
+    Array.isArray(activeModules) && 
+    activeModules.length > 0 && 
+    !hasValidLayout;
+    
+  // Check if the layout has any items for any breakpoint
+  const hasAnyLayoutItems = useMemo(() => {
+    if (!layout) return false;
+    return Object.values(layout).some(
+      breakpointItems => Array.isArray(breakpointItems) && breakpointItems.length > 0
+    );
+  }, [layout]);
+  
+  // List of components to render
+  const renderedComponents = useMemo(() => {
+    // Only render if we have valid layout
+    if (!hasAnyLayoutItems) return [];
+    return renderAll();
+  }, [hasAnyLayoutItems, renderAll]);
+  
   // Main render method
   return (
     <div className="w-full mx-auto relative">
-      <ResponsiveGridLayout
-        className="layout"
-        layouts={safeLayout}
-        breakpoints={breakpoints}
-        cols={cols}
-        rowHeight={DEFAULT_ROW_HEIGHT}
-        margin={[10, 10]}
-        containerPadding={[10, 10]}
-        onLayoutChange={handleLayoutChange}
-        compactType={null}
-        preventCollision
-        isDraggable={!isDragDisabled}
-        isResizable={!isDragDisabled}
-        draggableHandle=".pane-drag-handle"
-      >
-        {renderAll()}
-      </ResponsiveGridLayout>
+      {!hasValidLayout ? (
+        // Render empty state or error message when no valid layout exists
+        <div className="p-6 text-center rounded-lg border border-green-800/30 bg-black/30">
+          <h3 className="text-lg font-mono text-green-500 mb-4">Grid Layout Empty</h3>
+          
+          {hasActiveModulesButNoLayout ? (
+            <div>
+              <p className="text-green-400 mb-2">
+                You have {activeModules.length} active module(s) but no layout data.
+              </p>
+              <div className="mt-4">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-3 py-1 bg-green-700 text-white rounded hover:bg-green-600"
+                >
+                  Reload Dashboard
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-green-400">
+              Use the modules section in the left sidebar to launch components.
+            </p>
+          )}
+        </div>
+      ) : (
+        // Render grid layout when we have valid layout data
+        <>
+          {renderedComponents.length > 0 ? (
+            <ResponsiveGridLayout
+              className="layout"
+              layouts={safeLayout}
+              breakpoints={breakpoints}
+              cols={cols}
+              rowHeight={DEFAULT_ROW_HEIGHT}
+              margin={[10, 10]}
+              containerPadding={[10, 10]}
+              onLayoutChange={handleLayoutChange}
+              compactType={null}
+              preventCollision
+              isDraggable={!isDragDisabled}
+              isResizable={!isDragDisabled}
+              draggableHandle=".pane-drag-handle"
+            >
+              {renderedComponents}
+            </ResponsiveGridLayout>
+          ) : (
+            <div className="p-6 text-center rounded-lg border border-green-800/30 bg-black/30">
+              <h3 className="text-lg font-mono text-green-500 mb-4">No Components to Render</h3>
+              <p className="text-green-400">
+                Layout exists but no components were loaded. Check console for errors.
+              </p>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

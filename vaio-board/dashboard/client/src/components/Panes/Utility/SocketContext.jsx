@@ -1,8 +1,9 @@
 // filepath: /home/vaio/vaio-board/dashboard/client/src/components/Panes/Utility/SocketContext.jsx
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
+import { useEnvSocket } from './EnvSocketContext.jsx';
 
-// Create a context for socket connections and data
+// Create socket context
 const SocketContext = createContext();
 
 // Hook to access socket context
@@ -42,55 +43,55 @@ function throttle(func, limit) {
   };
 }
 
+// Socket event constants
+const SOCKET_EVENTS = {
+  CONNECT: 'connect',
+  DISCONNECT: 'disconnect',
+  CONNECT_ERROR: 'connect_error',
+  SERVICE_STATUS: 'service_status',
+  LOG_STREAM: 'logStream',
+  UNIFIED_LOG: 'unified_log',
+  SUPERVISOR_LOG: 'supervisorLogStream',
+  PANE_LAUNCHED: 'pane:launched',
+  CONNECT_MODULE: 'connect:module'
+};
+
 /**
  * Socket Provider Component
  * Manages WebSocket connections and related state
  */
 export function SocketProvider({ children }) {
-  // Get hostname from browser
-  const hostRef = useRef(typeof window !== 'undefined' ? window.location.hostname : 'localhost');
+  // Get metrics data from EnvSocketContext
+  const { metricsData, getMetricsSocket } = useEnvSocket();
   
-  // Socket connection state
+  // Socket state
+  const hostRef = useRef(typeof window !== 'undefined' ? window.location.hostname : 'localhost');
   const [mainSocket, setMainSocket] = useState(null);
   const [services, setServices] = useState([]);
   const [connected, setConnected] = useState(false);
   const [logStreams, setLogStreams] = useState({});
   const [errorLogs, setErrorLogs] = useState({});
   const [servicesWithErrors, setServicesWithErrors] = useState({});
-  const [metricsData, setMetricsData] = useState({
-    cpu: null,
-    memory: null,
-    gpu: null,
-    disk: null,
-    network: null
-  });
   
-  // Refs for tracking resources
-  const socketRefs = useRef({
-    main: null,
-    namespaces: {}
-  });
-  
-  // Buffers for batching updates
+  // Refs
+  const socketRefs = useRef({ main: null, namespaces: {} });
   const logBufferRef = useRef({});
   const errorLogBufferRef = useRef({});
 
   /**
-   * Fetch supervisor logs from backend
+   * Fetch supervisor logs
    */
   const fetchSupervisorLogs = useCallback(async () => {
     try {
-      // Add cache-busting timestamp
       const timestamp = new Date().getTime();
       const response = await fetch(`/api/logs/file?filename=supervisord.log&_t=${timestamp}`);
       
       if (!response.ok) {
-        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        throw new Error(`Server returned ${response.status}`);
       }
       
       const logContent = await response.text();
       if (logContent) {
-        // Update log streams
         setLogStreams(prev => ({
           ...prev,
           'supervisord.log': logContent
@@ -105,10 +106,10 @@ export function SocketProvider({ children }) {
   }, []);
   
   /**
-   * Apply buffered log updates in a throttled manner
+   * Apply log updates
    */
   const applyLogUpdates = useCallback(throttle(() => {
-    // Process regular logs
+    // Process logs
     const logBuffer = logBufferRef.current;
     if (Object.keys(logBuffer).length > 0) {
       setLogStreams(prev => {
@@ -117,7 +118,7 @@ export function SocketProvider({ children }) {
         for (const [service, data] of Object.entries(logBuffer)) {
           const current = newState[service] || '';
           
-          // Truncate log if it gets too long
+          // Truncate if too long
           const MAX_LOG_SIZE = 100000;
           const newLog = current.length > MAX_LOG_SIZE 
             ? current.substring(current.length - MAX_LOG_SIZE / 2) + data 
@@ -129,7 +130,6 @@ export function SocketProvider({ children }) {
         return newState;
       });
       
-      // Clear the buffer after processing
       logBufferRef.current = {};
     }
     
@@ -149,33 +149,27 @@ export function SocketProvider({ children }) {
         return newState;
       });
       
-      // Clear the buffer after processing
       errorLogBufferRef.current = {};
     }
   }, 300), []);
   
   /**
-   * Update log stream for a specific service
+   * Update log stream
    */
   const updateLogStream = useCallback((serviceName, data) => {
     if (!data || !serviceName) return;
     
-    // Clean and normalize the data
     const cleanData = stripHtml(data);
     
-    // Only add to buffer if data actually has content
     if (cleanData.trim()) {
-      // Add a line break if it doesn't already end with one
       const formattedData = cleanData.endsWith('\n') ? cleanData : cleanData + '\n';
-      
-      // Add to buffer
       logBufferRef.current[serviceName] = (logBufferRef.current[serviceName] || '') + formattedData;
       applyLogUpdates();
     }
   }, [applyLogUpdates]);
   
   /**
-   * Update error log stream for a specific service
+   * Update error log
    */
   const updateErrorLogStream = useCallback((serviceName, data) => {
     if (!data) return;
@@ -194,45 +188,12 @@ export function SocketProvider({ children }) {
   }, [applyLogUpdates]);
   
   /**
-   * Handle service status updates from socket events
+   * Handle service status updates
    */
   const handleServiceStatusUpdate = useCallback((services) => {
-    if (!Array.isArray(services)) return;
-    
-    setServices(prevServices => {
-      // Ensure all services have a module_type property
-      const enhancedServices = services.map(service => {
-        // If module_type is already provided from backend, use it
-        if (service.module_type) {
-          return service;
-        }
-        
-        // Otherwise, try to determine it from the service name
-        let moduleType = "service"; // Default type
-        
-        // Check for known system modules
-        if (service.name.toLowerCase() === "supervisor" || 
-            service.name.toLowerCase() === "system") {
-          moduleType = "system";
-        } 
-        // Check for user modules (custom logic if needed)
-        else if (service._isUserPane) {
-          moduleType = "user";
-        }
-        
-        return {
-          ...service,
-          module_type: moduleType
-        };
-      });
-      
-      // Skip update if nothing changed
-      if (JSON.stringify(enhancedServices) === JSON.stringify(prevServices)) {
-        return prevServices;
-      }
-      
-      return enhancedServices;
-    });
+    if (Array.isArray(services)) {
+      setServices(services);
+    }
   }, []);
   
   /**
@@ -241,16 +202,10 @@ export function SocketProvider({ children }) {
   const handleUnifiedLog = useCallback((data) => {
     if (!data || !data.service || !data.message) return;
     
-    // Format the timestamp
     const timestamp = new Date(data.timestamp || Date.now()).toLocaleTimeString();
-    
-    // Determine log level
     const level = (data.level || 'info').toUpperCase();
-    
-    // Create a formatted line
     const formattedLine = `[${timestamp}] [${data.service.toUpperCase()}] [${level}] ${data.message}`;
     
-    // Track errors for UI indicators
     if (data.level === 'error') {
       setServicesWithErrors(prev => ({
         ...prev,
@@ -258,17 +213,42 @@ export function SocketProvider({ children }) {
       }));
     }
     
-    // Add to the log stream
     updateLogStream(data.service, formattedLine);
   }, [updateLogStream]);
   
   /**
-   * Main effect for socket initialization and management
+   * Connect to a module namespace
+   */
+  const connectToModule = useCallback((moduleType) => {
+    if (!moduleType) return null;
+    
+    const namespace = `/modules/${moduleType}`;
+    const host = hostRef.current;
+    
+    if (socketRefs.current.namespaces[namespace]) {
+      return socketRefs.current.namespaces[namespace];
+    }
+    
+    try {
+      const socket = io(`http://${host}:1888${namespace}`, {
+        transports: ['websocket', 'polling']
+      });
+      
+      socketRefs.current.namespaces[namespace] = socket;
+      return socket;
+    } catch (error) {
+      console.error(`Error connecting to module ${moduleType}:`, error);
+      return null;
+    }
+  }, []);
+  
+  /**
+   * Initialize and manage socket
    */
   useEffect(() => {
     const host = hostRef.current;
     
-    // Create main socket
+    // Create socket
     const mainSocket = io(`http://${host}:1888`, {
       path: '/socket.io',
       reconnectionAttempts: 10,
@@ -279,46 +259,46 @@ export function SocketProvider({ children }) {
       reconnection: true,
     });
     
-    // Store socket reference
     socketRefs.current.main = mainSocket;
     setMainSocket(mainSocket);
     
-    // Set up event listeners
-    mainSocket.on('connect', () => {
-      console.log('Main socket connected');
-      setConnected(true);
+    // Event handlers
+    const eventHandlers = {
+      [SOCKET_EVENTS.CONNECT]: () => {
+        console.log('Socket connected');
+        setConnected(true);
+      },
+      
+      [SOCKET_EVENTS.DISCONNECT]: () => {
+        console.log('Socket disconnected');
+        setConnected(false);
+      },
+      
+      [SOCKET_EVENTS.CONNECT_ERROR]: (error) => {
+        console.error('Socket error:', error);
+      },
+      
+      [SOCKET_EVENTS.LOG_STREAM]: (data) => {
+        if (data?.filename && data?.line) {
+          updateLogStream(data.filename.replace('.log', ''), data.line);
+        }
+      },
+      
+      [SOCKET_EVENTS.UNIFIED_LOG]: handleUnifiedLog,
+      
+      [SOCKET_EVENTS.SUPERVISOR_LOG]: (line) => {
+        updateLogStream('supervisord.log', line);
+      },
+      
+      [SOCKET_EVENTS.SERVICE_STATUS]: handleServiceStatusUpdate
+    };
+    
+    // Register handlers
+    Object.entries(eventHandlers).forEach(([event, handler]) => {
+      mainSocket.on(event, handler);
     });
     
-    mainSocket.on('connect_error', (error) => {
-      console.error('Main socket connection error:', error);
-    });
-    
-    mainSocket.on('disconnect', (reason) => {
-      console.log(`Main socket disconnected. Reason: ${reason}`);
-      setConnected(false);
-    });
-    
-    // Log stream handlers
-    mainSocket.on('logStream', (data) => {
-      if (data && data.filename && data.line) {
-        updateLogStream(data.filename.replace('.log', ''), data.line);
-      }
-    });
-    
-    // Unified log handler
-    mainSocket.on('unified_log', handleUnifiedLog);
-    
-    // Supervisor log handler
-    mainSocket.on('supervisorLogStream', (line) => {
-      // Update log streams directly
-      updateLogStream('supervisord.log', line);
-    });
-    
-    // Service status handlers
-    mainSocket.on('service_status_update', handleServiceStatusUpdate);
-    mainSocket.on('service_status', handleServiceStatusUpdate);
-    
-    // Fetch services once via REST API
+    // Fetch services
     fetch('/api/service/services')
       .then(response => response.json())
       .then(services => {
@@ -326,36 +306,31 @@ export function SocketProvider({ children }) {
       })
       .catch(error => console.error('Failed to fetch services:', error));
     
-    // Refresh supervisor logs periodically
+    // Intervals
     const refreshInterval = setInterval(() => {
       fetchSupervisorLogs().catch(() => {});
     }, 30000);
     
-    // Update logs display periodically
     const updateInterval = setInterval(applyLogUpdates, 500);
     
-    // Cleanup function
+    // Cleanup
     return () => {
       clearInterval(refreshInterval);
       clearInterval(updateInterval);
       
-      // Clean up main socket
+      Object.entries(eventHandlers).forEach(([event]) => {
+        mainSocket.off(event);
+      });
+      
       if (socketRefs.current.main) {
         socketRefs.current.main.disconnect();
       }
       
-      // Clean up namespace sockets
       Object.values(socketRefs.current.namespaces).forEach(socket => {
-        if (socket) {
-          socket.disconnect();
-        }
+        if (socket) socket.disconnect();
       });
       
-      // Clear references
-      socketRefs.current = {
-        main: null,
-        namespaces: {}
-      };
+      socketRefs.current = { main: null, namespaces: {} };
     };
   }, [
     applyLogUpdates, 
@@ -365,72 +340,7 @@ export function SocketProvider({ children }) {
     handleUnifiedLog
   ]);
   
-  /**
-   * Get or create a metrics socket for a specific type
-   */
-  const getMetricsSocket = useCallback((type) => {
-    if (!type) {
-      console.error('getMetricsSocket called without a type parameter');
-      return null;
-    }
-    
-    const METRICS_NAMESPACES = {
-      cpu: '/graph-cpu',
-      memory: '/graph-memory',
-      gpu: '/graph-nvidia',
-      disk: '/graph-disk',
-      network: '/graph-network'
-    };
-    
-    const namespace = METRICS_NAMESPACES[type];
-    if (!namespace) {
-      console.error(`Unknown metrics type: ${type}`);
-      return null;
-    }
-    
-    // Check if we already have a connection
-    if (socketRefs.current.namespaces[namespace]) {
-      return socketRefs.current.namespaces[namespace];
-    }
-    
-    try {
-      // Create a new socket connection
-      const metricsSocket = io(namespace, {
-        transports: ['websocket', 'polling'],
-        forceNew: false,
-        reconnection: true,
-        reconnectionAttempts: 10,
-        reconnectionDelay: 1000
-      });
-      
-      // Store reference
-      socketRefs.current.namespaces[namespace] = metricsSocket;
-      
-      // Set up event handlers
-      metricsSocket.on('connect', () => {
-        console.log(`${type} metrics socket connected`);
-      });
-      
-      metricsSocket.on('connect_error', (error) => {
-        console.error(`${type} metrics socket connection error:`, error);
-      });
-      
-      // Handle metrics updates
-      metricsSocket.on('metrics_update', (data) => {
-        setMetricsData(prev => ({
-          ...prev,
-          [type]: data
-        }));
-      });
-      
-      return metricsSocket;
-    } catch (error) {
-      console.error(`Error creating ${type} metrics socket:`, error);
-      return null;
-    }
-  }, []);
-  
-  // Context value to provide
+  // Context value
   const contextValue = {
     socket: mainSocket,
     services,
@@ -440,7 +350,8 @@ export function SocketProvider({ children }) {
     servicesWithErrors,
     metricsData,
     getMetricsSocket,
-    fetchSupervisorLogs
+    fetchSupervisorLogs,
+    connectToModule
   };
   
   return (

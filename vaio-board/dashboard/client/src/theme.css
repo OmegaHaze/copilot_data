@@ -229,7 +229,7 @@ a:hover, p:hover, .text-hover-cursor {
 }
 
 .crt-glow-intense {
-  filter: drop-shadow(0 0 3px #39ff14) drop-shadow(0 0 6px #39ff14) drop-shadow(0 0 12px #39ff1480);
+  filter: drop-shadow(0 0 1px #39ff14) drop-shadow(0 0 3px #39ff14) drop-shadow(0 0 4px #39ff1480);
 }
 
 /* ==========================================================================
@@ -472,4 +472,217 @@ a:hover, p:hover, .text-hover-cursor {
       calc(100px - 200px * random())
     ) rotate(calc(720deg * random())) scale(2);
   }
+}
+
+/* ==========================================================================
+   Debug & Notification System
+   ========================================================================== */
+
+/* Border pulse animation for console errors */
+@keyframes notification-border-pulse {
+  0%, 100% { 
+    border-color: rgba(57, 255, 20, 0.3); 
+    box-shadow: 0 0 5px rgba(57, 255, 20, 0.15);
+  }
+  50% { 
+    border-color: rgba(57, 255, 20, 0.6); 
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.25);
+  }
+}
+
+.border-pulse {
+  animation: notification-border-pulse 2.5s infinite ease-in-out;
+}
+
+/* Error border pulse with red tint */
+@keyframes notification-error-pulse {
+  0%, 100% { 
+    border-color: rgba(239, 68, 68, 0.4); 
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.2);
+  }
+  50% { 
+    border-color: rgba(239, 68, 68, 0.7); 
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+  }
+}
+
+.error-border-pulse {
+  animation: notification-error-pulse 2s infinite ease-in-out;
+}
+
+/* Glass effect base for notifications */
+.glass-notification {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(57, 255, 20, 0.1);
+  box-shadow: 
+    0 2px 10px rgba(0, 0, 0, 0.4),
+    inset 0 0 15px rgba(57, 255, 20, 0.03);
+}
+
+/* Special glass effect for error notifications */
+.glass-notification-error {
+  background-color: rgba(0, 0, 0, 0.35);
+  border-color: rgba(239, 68, 68, 0.15);
+  box-shadow: 
+    0 2px 15px rgba(239, 68, 68, 0.1),
+    inset 0 0 15px rgba(239, 68, 68, 0.03);
+}
+
+/* Special glass effect for warning notifications */
+.glass-notification-warning {
+  background-color: rgba(0, 0, 0, 0.35);
+  border-color: rgba(245, 158, 11, 0.15);
+  box-shadow: 
+    0 2px 15px rgba(245, 158, 11, 0.1),
+    inset 0 0 15px rgba(245, 158, 11, 0.03);
+}
+
+/* Debug Overlay - Futuristic Glass Styling */
+.debug-glass {
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(57, 255, 20, 0.08);
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.4),
+    inset 0 0 20px rgba(57, 255, 20, 0.02);
+}
+
+.debug-glass-panel {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(57, 255, 20, 0.05);
+  border-radius: 4px;
+  box-shadow: 
+    0 2px 15px rgba(0, 0, 0, 0.3),
+    inset 0 0 10px rgba(57, 255, 20, 0.01);
+}
+
+.debug-tab-active {
+  background: rgba(0, 0, 0, 0.4);
+  border-bottom: 2px solid rgba(57, 255, 20, 0.6);
+  box-shadow: 0 -5px 15px rgba(57, 255, 20, 0.05);
+}
+
+.debug-tab-inactive {
+  border-bottom: 2px solid transparent;
+  opacity: 0.7;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Debug header styling */
+@keyframes debug-header-pulse {
+  0%, 100% {
+    text-shadow: 0 0 8px rgba(57, 255, 20, 0.4);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(57, 255, 20, 0.6);
+  }
+}
+
+.debug-header {
+  color: rgba(57, 255, 20, 0.8);
+  text-shadow: 0 0 8px rgba(57, 255, 20, 0.4);
+  letter-spacing: 1px;
+  transition: all 0.2s ease;
+  animation: debug-header-pulse 4s infinite ease-in-out;
+}
+
+/* Shadow glow utilities */
+.shadow-glow-sm {
+  filter: drop-shadow(0 0 2px currentColor);
+}
+
+.shadow-glow-md {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.shadow-glow-lg {
+  filter: drop-shadow(0 0 8px currentColor);
+}
+
+/* Hover effect for debug items */
+.debug-item-hover {
+  transition: all 0.15s ease-in-out;
+}
+
+.debug-item-hover:hover {
+  background-color: rgba(57, 255, 20, 0.1);
+  box-shadow: inset 0 0 8px rgba(57, 255, 20, 0.1);
+}
+
+/* Glowing border animation for debug panels */
+@keyframes debug-border-glow {
+  0%, 100% {
+    border-color: rgba(57, 255, 20, 0.1);
+    box-shadow: 
+      0 0 5px rgba(57, 255, 20, 0.05),
+      inset 0 0 5px rgba(57, 255, 20, 0.05);
+  }
+  50% {
+    border-color: rgba(57, 255, 20, 0.2);
+    box-shadow: 
+      0 0 10px rgba(57, 255, 20, 0.1),
+      inset 0 0 10px rgba(57, 255, 20, 0.1);
+  }
+}
+
+.debug-border-glow {
+  animation: debug-border-glow 4s infinite ease-in-out;
+}
+
+/* Pulsing indicator dot */
+@keyframes debug-indicator-pulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+    box-shadow: 0 0 5px currentColor;
+  }
+}
+
+.debug-indicator {
+  animation: debug-indicator-pulse 2s infinite ease-in-out;
+}
+
+/* The debug overlay container with CRT scanlines effect */
+.debug-overlay-container {
+  background-color: rgba(0, 0, 0, 0.8);
+  position: relative;
+}
+
+.debug-overlay-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 50%,
+    rgba(0, 0, 0, 0.05) 51%
+  );
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.15;
+}
+
+.debug-tab-inactive:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.debug-header {
+  color: rgba(57, 255, 20, 0.9);
+  text-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
+}
+
+.debug-text-glow {
+  text-shadow: 0 0 5px currentColor;
 }

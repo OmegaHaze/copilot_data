@@ -8,7 +8,7 @@ import { SettingsContext } from '../../../SettingsMenu/SettingsContext.jsx';
 import { debouncedSaveToSession } from './LayoutManager.js';
 
 // Import the unified component system
-import { initializeComponentRegistry, getPaneMap, getLogoMap } from './ComponentRegistryInitializer.js';
+import { initializeComponentRegistry, getPaneMap, getLogoMap } from '../Loader/ ComponentRegistryInitializer.js';
 import { componentRegistry } from './ComponentRegistry.js';
 import { loadLayout, saveLayoutToLocal, createEmptyLayout, BREAKPOINTS } from './LayoutManager.js';
 import { useSocket } from '../SocketContext.jsx';
@@ -70,21 +70,34 @@ export default function ServiceMatrix() {
         // Use the unified component registry initializer
         const result = await initializeComponentRegistry();
         
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to initialize component registry');
-        }
-        
         // Store modules data
         if (result.moduleData) {
           setModules(result.moduleData);
         }
         
-        // Log success information
+        // Log information
         const componentKeys = Object.keys(result.paneMap || {});
         console.log(`Initialized component registry with ${componentKeys.length} components`);
         
         if (componentKeys.length === 0) {
           console.warn('No components were loaded!');
+          // Set an error but still continue
+          setError('No UI components could be loaded. Please check the browser console for details.');
+        }
+        
+        // If there's a specific error message, display it
+        if (result.errorMessage) {
+          console.warn('Component registry initialization warning:', result.errorMessage);
+          setError(result.errorMessage);
+        }
+        
+        // List what was loaded and what failed
+        if (result.loadedComponents?.length > 0) {
+          console.log('Successfully loaded:', result.loadedComponents.join(', '));
+        }
+        
+        if (result.failedComponents?.length > 0) {
+          console.warn('Failed to load:', result.failedComponents.join(', '));
         }
         
         setIsLoading(false);
