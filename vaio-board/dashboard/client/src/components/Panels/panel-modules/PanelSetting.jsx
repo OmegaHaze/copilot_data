@@ -1,8 +1,6 @@
 import { useContext } from 'react'
 import { SettingsContext } from '../../SettingsMenu/SettingsContext'
-import ModuleReloadButton from '../../Diagnostics/ModuleReloadButton'
-import SupervisorRegistrationUtil from '../../Diagnostics/SupervisorRegistrationUtil'
-import LayoutDebugUtil from '../../Diagnostics/LayoutDebugUtil'
+// Diagnostic components removed - now only available in Debug Overlay
 
 export default function PanelSetting({ 
   settingsOpen, 
@@ -239,12 +237,19 @@ export default function PanelSetting({
                 <div className="crt-text4 text-xs space-y-3">
                   <div>
                     <h3 className="font-bold mb-1">Module Operations</h3>
-                    <ModuleReloadButton />
+                    {/* Diagnostic components moved to Debug Overlay */}
+                    <div className="mt-2">
+                      <button 
+                        className="bg-blue-900/30 text-blue-300 px-3 py-1 rounded text-xs"
+                        onClick={() => window.toggleDebugOverlay && window.toggleDebugOverlay()}
+                      >
+                        Open Debug Overlay
+                      </button>
+                      <p className="text-gray-400 text-xs mt-1">
+                        Module diagnostics are now available in the Debug Overlay
+                      </p>
+                    </div>
                   </div>
-                  
-                  <SupervisorRegistrationUtil />
-                  
-                  <LayoutDebugUtil />
                 </div>
               </div>
             )}

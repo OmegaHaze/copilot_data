@@ -1,6 +1,6 @@
 import React from 'react';
-import { componentRegistry } from '../Panes/Utility/Loader/ComponentRegistry.js';
-import { initializeComponentRegistry } from '../Panes/Utility/Loader/ ComponentRegistryInitializer.js';
+import { componentRegistry } from '../../Panes/Utility/Loader/ComponentRegistry.js';
+import { initializeComponentRegistry } from '../../Panes/Utility/Loader/ ComponentRegistryInitializer.js';
 
 /**
  * Module reload button for debugging

@@ -173,11 +173,20 @@ function countLayoutItems(layout) {
  * @returns {Object} The resolved layout
  */
 export async function resolveLayout({ sessionData, items }) {
+  // Check if session data is available
+  if (!sessionData) {
+    console.warn('No session data provided to resolveLayout, creating empty layout');
+    const emptyLayout = createEmptyLayout();
+    return emptyLayout;
+  }
+  
   // First try to get layout from session data (database)
   const fromSession = hydrateLayoutFromDB(sessionData?.grid_layout);
   
   // Check if we need to create layout items for active modules
   if (sessionData?.active_modules?.length > 0) {
+    console.log('Session has active modules:', sessionData.active_modules);
+    
     // We have active modules but need to check if they have layout items
     const hasLayoutItems = countLayoutItems(fromSession) > 0;
     
@@ -247,15 +256,22 @@ export async function resolveLayout({ sessionData, items }) {
 /**
  * Load layout during application initialization
  * @param {Array} items - Available module items
+ * @param {Object} [providedSessionData] - Optional session data to use instead of fetching from registry
  * @returns {Object} The resolved layout
  */
-export const loadLayout = async (items = []) => {
+export const loadLayout = async (items = [], providedSessionData = null) => {
   console.log('Loading layout for items:', items.length);
   
-  // Get session data from the component registry
-  const sessionData = componentRegistry.getModuleData();
+  // Use provided session data or fetch from the component registry
+  const sessionData = providedSessionData || componentRegistry.getModuleData();
+  
+  if (!sessionData) {
+    console.warn('No session data available for layout loading');
+  }
+  
   console.log('Session data loaded:', {
     hasGridLayout: !!sessionData?.grid_layout,
+    hasActiveModules: Array.isArray(sessionData?.active_modules) && sessionData?.active_modules.length > 0,
     itemCount: items.length
   });
   

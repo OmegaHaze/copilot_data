@@ -3,7 +3,6 @@ import HeaderAscii from '../Boot/HeaderAscii.jsx'
 import { useSocket } from '../Panes/Utility/SocketContext'
 import LaunchButtonSuper from '../Panes/Utility/Launchers/LaunchButtonSuper.jsx'
 import LaunchButtonNvidia from '../Panes/Utility/Launchers/LaunchButtonNvidia.jsx'
-import DebugOverlayTestButton from '../Error-Handling/DebugOverlayTestButton.jsx'
 
 
 
@@ -406,19 +405,7 @@ export default function SidePanelLeft({ show, toggle }) {
                   <span className="text-xs">RESET LAYOUT (NUCLEAR OPTION)</span>
                 </button>
               </div>
-
-              {/* Debug Overlay Button */}
-              <div className="mt-3 border-t border-green-800/30 pt-2">
-                <div className="flex items-center w-full p-1 rounded hover:bg-green-900/20">
-                  <div className="w-8 h-8 mr-2 flex items-center justify-center crt-border6 rounded">
-                    <span className="crt-text4">⚙️</span>
-                  </div>
-                  <span className="text-xs flex-grow">DEBUG OVERLAY</span>
-                  <DebugOverlayTestButton />
-                </div>
-              </div>
-
-                      </div>
+</div>
         )}
       </div>
       

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { componentRegistry } from '../Panes/Utility/Loader/ComponentRegistry.js';
-import { registerEssentialComponents } from '../Panes/Utility/Loader/ManualComponentRegistration.js';
+import { componentRegistry } from '../../Panes/Utility/Loader/ComponentRegistry.js';
+import { registerEssentialComponents } from '../../Error-Handling/tabs/DebugOverlayManualRegistration.jsx';
 
 /**
  * Diagnostic component to inspect module initialization

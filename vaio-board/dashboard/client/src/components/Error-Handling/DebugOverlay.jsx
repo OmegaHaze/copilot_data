@@ -6,6 +6,7 @@ import DebugOverlayGeneral from './tabs/DebugOverlayGeneral.jsx';
 import DebugOverlaySession from './tabs/DebugOverlaySession.jsx';
 import DebugOverlayNetwork from './tabs/DebugOverlayNetwork.jsx';
 import DebugOverlayStorage from './tabs/DebugOverlayStorage.jsx';
+import DebugOverlayManualRegistration from './tabs/DebugOverlayManualRegistration.jsx';
 
 // Debug Overlay with enhanced monitoring capabilities
 export default function DebugOverlay() {
@@ -440,6 +441,16 @@ export default function DebugOverlay() {
             Storage
           </button>
           <button 
+            onClick={() => setActiveTab('manual-registration')}
+            className={`px-3 py-1.5 mr-1 text-xs transition-all ${
+              activeTab === 'manual-registration' 
+                ? 'text-green-300 border-b-2 border-green-500/60' 
+                : 'text-green-500 hover:text-green-400 hover:border-b-2 hover:border-green-500/30'
+            }`}
+          >
+            Manual Registration
+          </button>
+          <button 
             onClick={() => setActiveTab('socket')}
             className={`px-3 py-1.5 mr-1 text-xs transition-all ${
               activeTab === 'socket' 
@@ -507,6 +518,11 @@ export default function DebugOverlay() {
             <DebugOverlayStorage
               storageData={storageData}
             />
+          )}
+          
+          {/* Manual Registration Tab - Component Manual Registration */}
+          {activeTab === 'manual-registration' && (
+            <DebugOverlayManualRegistration />
           )}
           
           {/* Socket Tab - Socket.io Data Monitoring */}

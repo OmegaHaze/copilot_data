@@ -6,8 +6,7 @@ import SetAdmin from './components/Admin/SetAdmin.jsx';
 import Login from './components/Admin/Login.jsx';
 import BootShell from './components/Boot/BootShell.jsx';
 
-// Import diagnostic tools
-import ModuleChecker from './components/Diagnostics/ModuleChecker.jsx';
+// No diagnostic tools imported directly - use Debug Overlay instead
 
 // Import error test button
 import ErrorTestButton from './components/Error-Handling/ErrorTestButton.jsx';
@@ -78,12 +77,11 @@ function AppContent() {
           <ServiceMatrix />
           <PaneHeaderSettings />
           <DebugOverlay />
-          {/* Run module diagnostic on load */}
-          <ModuleChecker />
+          {/* Module diagnostics are now part of Debug Overlay */}
           {import.meta.env.DEV && (
             // Only include test button in development
             <Suspense fallback={<></>}>
-              <TestErrorButton />
+              <ErrorTestButton />
             </Suspense>
           )}
         </>

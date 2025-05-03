@@ -187,6 +187,8 @@ export default function LaunchButtonSuper({ moduleType, label = null }) {
           module_type: moduleType, // Add module_type for backend compatibility
           instanceId, 
           paneId,
+          layout: updatedLayout, // Include layout data for other components to react to
+          activeModules: updatedModules, // Include active modules list
           timestamp: Date.now()
         });
         
@@ -194,7 +196,15 @@ export default function LaunchButtonSuper({ moduleType, label = null }) {
         console.log(`Requesting connection to module namespace: ${moduleType}`);
         socket.emit("connect:module", {
           name: moduleType,
-          module_type: moduleType
+          module_type: moduleType,
+          instanceId // Include instanceId for targeted events
+        });
+        
+        // Broadcast an update to all clients
+        socket.emit("layout:updated", {
+          layout: updatedLayout,
+          activeModules: updatedModules,
+          timestamp: Date.now()
         });
       }
       

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { saveLayoutToSession } from '../Panes/Utility/Loader/LayoutManager.js';
+import { saveLayoutToSession } from '../../Panes/Utility/Loader/LayoutManager.js';
 
 /**
  * Debug utility for testing save layout functionality

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { componentRegistry } from '../Panes/Utility/Loader/ComponentRegistry.js';
-import { registerEssentialComponents } from '../Panes/Utility/Loader/ManualComponentRegistration.js';
+import { componentRegistry } from '../../Panes/Utility/Loader/ComponentRegistry.js';
+import { registerEssentialComponents } from '../../Error-Handling/tabs/DebugOverlayManualRegistration.jsx';
 
 /**
  * Utility to manually register the supervisor module if it's missing

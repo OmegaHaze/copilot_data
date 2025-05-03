@@ -259,6 +259,51 @@ class ComponentRegistry {
   isInitialized() {
     return this.initialized;
   }
+  
+  /**
+   * Synchronize the registry with session data
+   * @param {Object} sessionData - Session data from API
+   */
+  synchronizeWithSessionData(sessionData) {
+    if (!sessionData) {
+      console.warn('Attempted to synchronize ComponentRegistry with null session data');
+      return false;
+    }
+    
+    try {
+      // Process active modules
+      if (sessionData.active_modules && Array.isArray(sessionData.active_modules)) {
+        // Track which modules are active and parse any instances
+        sessionData.active_modules.forEach(moduleId => {
+          if (moduleId.includes('-')) {
+            // This is a module with instance ID
+            const [moduleType, instanceId] = moduleId.split('-');
+            if (!this.instances.has(moduleType)) {
+              this.instances.set(moduleType, new Set());
+            }
+            this.instances.get(moduleType).add(instanceId);
+          }
+        });
+      }
+      
+      // Store grid layout in registry for reference
+      if (sessionData.grid_layout) {
+        this.sessionGridLayout = sessionData.grid_layout;
+      }
+      
+      return true;
+    } catch (err) {
+      console.error('Error synchronizing ComponentRegistry with session data:', err);
+      return false;
+    }
+  }
+  
+  /**
+   * Get the grid layout from session data
+   */
+  getSessionGridLayout() {
+    return this.sessionGridLayout || {};
+  }
 }
 
 // Export singleton instance
