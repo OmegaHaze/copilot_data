@@ -3,7 +3,7 @@
  * Provides constants and functions for grid layout generation
  */
 
-// Default dimensions for grid items (doubled from original)
+// Default dimensions for grid items
 export const DEFAULT_WIDTH = 12;
 export const DEFAULT_HEIGHT = 8;
 
@@ -33,6 +33,7 @@ export const cols = {
 
 /**
  * Get all breakpoint names as an array
+ * @returns {string[]} Array of breakpoint names
  */
 export const getBreakpoints = () => Object.keys(breakpoints);
 
@@ -42,6 +43,11 @@ export const getBreakpoints = () => Object.keys(breakpoints);
  * @returns {Object} Layouts configuration for all breakpoints
  */
 export function generateDefaultLayout(items = []) {
+  if (!Array.isArray(items)) {
+    console.warn('generateDefaultLayout: items is not an array');
+    return { lg: [], md: [], sm: [], xs: [], xxs: [] };
+  }
+  
   const layouts = {};
 
   Object.entries(cols).forEach(([breakpoint, colCount]) => {
@@ -60,34 +66,52 @@ export function generateDefaultLayout(items = []) {
  * @returns {Array} Layout configuration for the specified breakpoint
  */
 export function generateLayoutForBreakpoint(items = [], colCount = 48) {
+  if (!Array.isArray(items)) {
+    console.warn('generateLayoutForBreakpoint: items is not an array');
+    return [];
+  }
+  
+  if (typeof colCount !== 'number' || colCount <= 0) {
+    console.warn(`Invalid column count: ${colCount}, using default 48`);
+    colCount = 48;
+  }
+  
   const result = [];
   let x = 0;
   let y = 0;
 
   items.forEach((item) => {
+    // Skip invalid items
+    if (!item || typeof item !== 'object') {
+      return;
+    }
+    
     // Extract key from module or name property
     const key = item.module?.toLowerCase() || item.name?.toLowerCase();
     if (!key) return;
 
     // Get dimensions, potentially from item or use defaults
-    const w = item.width || DEFAULT_WIDTH;
-    const h = item.height || DEFAULT_HEIGHT;
+    const w = typeof item.width === 'number' ? item.width : DEFAULT_WIDTH;
+    const h = typeof item.height === 'number' ? item.height : DEFAULT_HEIGHT;
 
+    // Safety check to prevent items wider than the grid
+    const itemWidth = Math.min(w, colCount);
+    
     // Create the layout item
     result.push({
       i: key,         // Unique identifier
       x,              // X position
       y,              // Y position
-      w,              // Width
+      w: itemWidth,   // Width (constrained to grid)
       h,              // Height
       static: false,  // Allow movement/resizing
-      minW: 3,        // Minimum width (increased)
-      minH: 3         // Minimum height (increased)
+      minW: 3,        // Minimum width
+      minH: 3         // Minimum height
     });
 
     // Calculate next position
-    x += w;
-    if (x + w > colCount) {
+    x += itemWidth;
+    if (x + DEFAULT_WIDTH > colCount) {
       x = 0;
       y += h;
     }
@@ -105,12 +129,22 @@ export function generateLayoutForBreakpoint(items = [], colCount = 48) {
  * @returns {Array} Combined array of all items
  */
 export function getAllGridItems(services = [], modules = {}) {
+  if (!Array.isArray(services)) {
+    console.warn('getAllGridItems: services is not an array');
+    services = [];
+  }
+  
+  if (!modules || typeof modules !== 'object') {
+    console.warn('getAllGridItems: modules is not an object');
+    modules = {};
+  }
+  
   return [
     ...services,
-    ...(modules.system || []),
-    ...(modules.service || []),
-    ...(modules.user || [])
-  ];
+    ...(Array.isArray(modules.SYSTEM) ? modules.SYSTEM : []),
+    ...(Array.isArray(modules.SERVICE) ? modules.SERVICE : []),
+    ...(Array.isArray(modules.USER) ? modules.USER : [])
+  ].filter(Boolean); // Remove null/undefined items
 }
 
 /**
@@ -124,7 +158,8 @@ export function isValidLayoutItem(item) {
   return (
     item && 
     typeof item === 'object' &&
-    item.i && 
+    typeof item.i === 'string' && 
+    item.i.length > 0 && 
     typeof item.x === 'number' && 
     typeof item.y === 'number' &&
     typeof item.w === 'number' &&
@@ -142,14 +177,42 @@ export function isValidLayoutItem(item) {
  * @returns {Object} {x, y} position
  */
 export function findFirstAvailablePosition(layoutItems = [], colCount = 48, itemSize = { w: DEFAULT_WIDTH, h: DEFAULT_HEIGHT }) {
+  // Validate inputs
+  if (!Array.isArray(layoutItems)) {
+    console.warn('findFirstAvailablePosition: layoutItems is not an array');
+    return { x: 0, y: 0 };
+  }
+  
+  if (typeof colCount !== 'number' || colCount <= 0) {
+    console.warn(`Invalid column count: ${colCount}, using default 48`);
+    colCount = 48;
+  }
+  
+  if (!itemSize || typeof itemSize !== 'object') {
+    itemSize = { w: DEFAULT_WIDTH, h: DEFAULT_HEIGHT };
+  }
+  
+  // Ensure item size has valid dimensions
+  const w = typeof itemSize.w === 'number' ? itemSize.w : DEFAULT_WIDTH;
+  const h = typeof itemSize.h === 'number' ? itemSize.h : DEFAULT_HEIGHT;
+  
+  // Constrain width to column count
+  const itemWidth = Math.min(w, colCount);
+  
   // If no items, start at origin
-  if (!layoutItems.length) return { x: 0, y: 0 };
+  if (layoutItems.length === 0) {
+    return { x: 0, y: 0 };
+  }
+  
+  // Get only valid layout items
+  const validItems = layoutItems.filter(isValidLayoutItem);
   
   // Find the maximum Y position used
-  const maxY = Math.max(...layoutItems.map(item => item.y + item.h), 0);
+  const maxY = validItems.length > 0 ? 
+    Math.max(...validItems.map(item => item.y + item.h), 0) : 0;
   
   // First, try to find a free spot in the last row
-  const lastRowItems = layoutItems.filter(item => item.y + item.h > maxY - itemSize.h);
+  const lastRowItems = validItems.filter(item => item.y + item.h > maxY - h);
   
   // Sort the last row items by x position
   lastRowItems.sort((a, b) => a.x - b.x);
@@ -159,7 +222,7 @@ export function findFirstAvailablePosition(layoutItems = [], colCount = 48, item
     const lastItem = lastRowItems[lastRowItems.length - 1];
     const potentialX = lastItem.x + lastItem.w;
     
-    if (potentialX + itemSize.w <= colCount) {
+    if (potentialX + itemWidth <= colCount) {
       return { x: potentialX, y: lastItem.y };
     }
   }

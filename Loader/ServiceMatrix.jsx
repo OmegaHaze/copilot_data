@@ -1,8 +1,7 @@
 import { useEffect, useState, useContext, useCallback, useMemo } from 'react';
 import ServiceGrid from './ServiceGrid.jsx';
 import { SettingsContext } from '../Context/SettingsContext.jsx';
-import { debouncedSaveToSession, loadLayouts, saveLayoutsToLocal, BREAKPOINTS } from './LayoutManager.js';
-import { createEmptyLayouts } from './LayoutTransformer.js';
+import { debouncedSaveToSession, loadLayouts, saveLayoutsToLocal } from './LayoutManager.js';
 import { filterByActiveModules } from './ModuleFilter.js';
 import { fetchAndSyncSessionData, refreshSessionData } from './SessionManager.js';
 import { initializeComponentRegistry, getPaneMap, getLogoMap } from './ComponentRegistryInitializer.js';
@@ -21,7 +20,7 @@ export default function ServiceMatrix() {
   const { showError } = useError();
 
   // Component state
-  const [layouts, setLayouts] = useState(createEmptyLayouts());
+  const [layouts, setLayouts] = useState({ lg: [], md: [], sm: [], xs: [], xxs: [] });
   const [modules, setModules] = useState({ SYSTEM: [], SERVICE: [], USER: [] });
   const [filteredItems, setFilteredItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,7 +32,7 @@ export default function ServiceMatrix() {
     console.error(`${context}:`, error);
     showError(
       `${context}: ${error.message}`,
-      ErrorType.SYSTEM,  // Use a proper ErrorType instead of 'error'
+      ErrorType.SYSTEM,
       ErrorSeverity.MEDIUM
     );
     setError(`${context}: ${error.message}`);
@@ -44,9 +43,8 @@ export default function ServiceMatrix() {
     async function loadComponents() {
       try {
         setIsLoading(true);
-        console.log('Starting component registry initialization...');
         
-        // Attempt normal initialization
+        // Initialize component registry
         const result = await initializeComponentRegistry();
         
         // Process registry results
@@ -54,16 +52,9 @@ export default function ServiceMatrix() {
           setModules(result.moduleData);
         }
         
-        const componentKeys = Object.keys(result.paneMap || {});
-        console.log(`Initialized component registry with ${componentKeys.length} components`);
-        
-        if (componentKeys.length === 0) {
-          const error = new Error('No UI components were loaded');
-          handleError(error, 'Component Initialization');
-        }
-        
-        if (result.errorMessage) {
-          handleError(new Error(result.errorMessage), 'Component Initialization');
+        if (!result.success) {
+          handleError(new Error(result.errorMessage || 'Failed to initialize components'), 
+                      'Component Initialization');
         }
         
         setIsLoading(false);
@@ -88,21 +79,14 @@ export default function ServiceMatrix() {
         handleError(err, 'Session data error');
       });
     }
-  }, [isLoading, setActiveModules, setGridLayout, handleError, modules, showError]);
+  }, [isLoading, setActiveModules, setGridLayout, handleError]);
   
   // === Active Module Handling ===
   useEffect(() => {
     async function updateActiveComponents() {
       try {
         if (!isLoading) {
-          console.log('ServiceMatrix: Updating active components', {
-            activeModules,
-            socketServices: socketServices?.length || 0,
-            systemModules: modules.SYSTEM?.length || 0,
-            serviceModules: modules.SERVICE?.length || 0,
-            userModules: modules.USER?.length || 0
-          });
-          
+          // Combine all potential items
           const allPotentialItems = [
             ...(socketServices || []),
             ...(modules.SYSTEM || []),
@@ -110,19 +94,16 @@ export default function ServiceMatrix() {
             ...(modules.USER || [])
           ];
           
-          console.log('ServiceMatrix: All potential items', allPotentialItems);
-          
+          // Filter items based on active modules
           const filteredItems = await filterByActiveModules(allPotentialItems, activeModules);
-          console.log('ServiceMatrix: Filtered items', filteredItems);
           setFilteredItems(filteredItems);
           
+          // Load layouts using filtered items and session data
           const layoutsData = await loadLayouts(filteredItems, sessionData);
-          console.log('ServiceMatrix: Loaded layouts', layoutsData);
           setLayouts(layoutsData);
         }
       } catch (err) {
-        console.error('ServiceMatrix: Error updating active components', err);
-        handleError(err, 'Layouts update failed');
+        handleError(err, 'Active components update failed');
       }
     }
     
@@ -131,28 +112,31 @@ export default function ServiceMatrix() {
   
   // === Layout Management ===
   const onLayoutChange = useCallback((updatedLayouts) => {
+    // Ensure all breakpoints exist
     const normalized = {};
-    BREAKPOINTS.forEach(bp => {
+    ['lg', 'md', 'sm', 'xs', 'xxs'].forEach(bp => {
       normalized[bp] = updatedLayouts[bp] || [];
     });
     
-    // Update local state only, debounce server updates
+    // Update local state
     setLayouts(normalized);
     setGridLayout(normalized);
+    
+    // Save to local storage for quick recovery
     saveLayoutsToLocal(normalized);
     
-    // Debounce both session save and socket emit
-    debouncedSaveToSession(normalized)
+    // Debounce server updates to avoid excessive API calls
+    debouncedSaveToSession(normalized, activeModules)
       .catch(err => handleError(err, 'Failed to save layouts'));
-      
+    
+    // Notify other components via socket
     if (socket?.emit) {
-      // Debounce socket emit to avoid rapid updates
       socket.emit('layouts:updated', {
         layouts: normalized,
         timestamp: Date.now()
       }, { debounce: true });
     }
-  }, [socket, setGridLayout, handleError]);
+  }, [socket, setGridLayout, activeModules, handleError]);
   
   // === Listen for Pane Events ===
   useEffect(() => {
@@ -163,7 +147,7 @@ export default function ServiceMatrix() {
           setActiveModules,
           setGridLayout,
           setLayouts,
-          componentRegistry,
+          componentRegistry: window.componentRegistry,
           reason
         }).catch(err => handleError(err, `Failed to refresh session on ${reason}`));
       };
@@ -180,43 +164,49 @@ export default function ServiceMatrix() {
     }
   }, [socket, isLoading, setActiveModules, setGridLayout, handleError]);
 
-  // === UI Components ===
-  const errorContent = useMemo(() => (
-    <div className="fixed inset-0 flex h-full w-full items-center justify-center">
-      <div className="text-red-300 text-xl">
-        Connection lost - Please check your network connection
+  // === UI States ===
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center w-full h-full">
+        <div className="text-gray-400">LOADING GRID...</div>
       </div>
-    </div>
-  ), []);
+    );
+  }
 
-  // === Render ===
+  // Error state
+  if (error) {
+    return (
+      <div className="relative bg-red-800/20 p-4 rounded border border-red-500">
+        <h3 className="text-red-400 text-lg">ERROR</h3>
+        <p className="text-red-300">{error}</p>
+      </div>
+    );
+  }
+
+  // Disconnected state
+  if (!connected) {
+    return (
+      <div className="fixed inset-0 flex h-full w-full items-center justify-center">
+        <div className="text-red-300 text-xl">
+          Connection lost - Please check your network connection
+        </div>
+      </div>
+    );
+  }
+
+  // Main render - grid
   return (
     <div className="relative w-full h-full">
-      {/* Main grid with z-20 to stay above boot background but below error effects */}
-      <div className="relative">
-        {isLoading ? (
-          <div className="flex items-center justify-center w-full h-full">
-            <div className="text-gray-400">LOADING GRID...</div>
-          </div>
-        ) : error ? (
-          <div className="relative bg-red-800/20 p-4 rounded border border-red-500">
-            <h3 className="text-red-400 text-lg">ERROR</h3>
-            <p className="text-red-300">{error}</p>
-          </div>
-        ) : !connected ? (
-          errorContent
-        ) : (
-          <ServiceGrid
-            layouts={layouts}
-            onLayoutChange={onLayoutChange}
-            services={filteredItems}
-            modules={modules}
-            paneMap={getPaneMap()}
-            logoUrls={getLogoMap()}
-            activeModules={activeModules}
-          />
-        )}
-      </div>
+      <ServiceGrid
+        layouts={layouts}
+        onLayoutChange={onLayoutChange}
+        services={filteredItems}
+        modules={modules}
+        paneMap={getPaneMap()}
+        logoUrls={getLogoMap()}
+        activeModules={activeModules}
+      />
     </div>
   );
 }

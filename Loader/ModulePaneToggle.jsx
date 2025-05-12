@@ -1,31 +1,26 @@
 import { useContext } from 'react';
-import { useError } from '../../../Error-Handling/Diagnostics/ErrorNotificationSystem.jsx';
 import { SettingsContext } from '../Context/SettingsContext.jsx'
 import { useSocket } from '../Context/SocketContext.jsx'
 import LaunchButtonSuper from '../Launchers/LaunchButtonSuper.jsx'
 import { saveLayoutsToSession } from './LayoutManager.js'
 import { componentRegistry } from './ComponentRegistry';
 import { updateModulesSession } from './SessionManager.js'
+import { useError } from '../../../Error-Handling/Diagnostics/ErrorNotificationSystem.jsx';
 
 export default function ModulePaneToggle({ slug, label = null }) {
   const { gridLayout, setGridLayout, activeModules, setActiveModules } = useContext(SettingsContext)
   const { socket } = useSocket()
-
-  // Check if this module has any active instances
+  const { showError } = useError();
+  
+  // Find active instances of this module type
   const findActiveInstances = () => {
-    if (!Array.isArray(activeModules)) return [];
+    if (!Array.isArray(activeModules) || !slug) return [];
     
-    const canonicalSlug = componentRegistry.getCanonicalKey(slug);
-    
-    // Look for any modules that match the canonical key
-    return activeModules.filter(moduleId => {
-      const moduleKey = componentRegistry.getCanonicalKey(moduleId);
-      return moduleKey === canonicalSlug;
-    });
+    const moduleType = componentRegistry.getCanonicalKey(slug);
+    return activeModules.filter(id => id.startsWith(`${moduleType}-`));
   };
   
-  const activeInstances = findActiveInstances();
-  const hasActiveInstances = activeInstances.length > 0;
+  const hasActiveInstances = findActiveInstances().length > 0;
 
   const handleRemove = async () => {
     try {
@@ -50,17 +45,7 @@ export default function ModulePaneToggle({ slug, label = null }) {
       setGridLayout(updatedLayouts);
       
       // Persist state changes
-      try {
-        await Promise.all([
-          saveLayoutsToSession(updatedLayouts),
-          updateModulesSession(updatedModules)
-        ]);
-      } catch (err) {
-        showError(
-          `Failed to persist pane removal: ${err.message}`,
-          'error'
-        );
-      }
+      await saveLayoutsToSession(updatedLayouts, updatedModules);
       
       // Notify other components
       if (socket?.emit) {
@@ -70,8 +55,6 @@ export default function ModulePaneToggle({ slug, label = null }) {
           timestamp: Date.now()
         });
       }
-      
-      console.log(`🗑️ Removed all ${slug} instances:`, instances);
     } catch (err) {
       showError(
         `Failed to remove pane ${slug}: ${err.message}`,
@@ -80,7 +63,7 @@ export default function ModulePaneToggle({ slug, label = null }) {
     }
   };
 
-  // We want to either launch a new instance or remove all existing instances
+  // Either launch a new instance or remove existing ones
   return (
     <div className="p-2">
       {hasActiveInstances ? (

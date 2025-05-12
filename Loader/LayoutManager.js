@@ -1,19 +1,15 @@
 // LayoutManager.js - Responsible for layout persistence and storage operations
-
 import debounce from 'lodash/debounce';
 import { errorHandler } from '../../../Error-Handling/utils/errorHandler';
 import { ErrorType, ErrorSeverity } from '../../../Error-Handling/Diagnostics/types/errorTypes';
-import { 
-  sanitizeLayoutsForStorage, 
-  hydrateLayoutsFromDB, 
-  createEmptyLayouts,
-  transformLayouts,
-  isValidResponsiveLayout
-} from './LayoutTransformer.js';
 
 // Constants
 const STORAGE_KEY = 'vaio_layouts';
 export const BREAKPOINTS = ['lg', 'md', 'sm', 'xs', 'xxs'];
+
+// Development environment detection
+const isDev = window.location.hostname === 'localhost' || 
+             window.location.hostname === '127.0.0.1';
 
 /**
  * Validates a layouts object to ensure it has the proper structure
@@ -23,14 +19,14 @@ export const BREAKPOINTS = ['lg', 'md', 'sm', 'xs', 'xxs'];
 export function validateLayouts(layouts) {
   // Check if layouts is an object
   if (!layouts || typeof layouts !== 'object') {
-    console.error('Invalid layouts: not an object');
+    if (isDev) console.error('Invalid layouts: not an object');
     return false;
   }
   
   // Check if layouts has required breakpoints
   for (const breakpoint of BREAKPOINTS) {
     if (!layouts[breakpoint] || !Array.isArray(layouts[breakpoint])) {
-      console.error(`Invalid layouts: missing or invalid breakpoint ${breakpoint}`);
+      if (isDev) console.error(`Invalid layouts: missing or invalid breakpoint ${breakpoint}`);
       return false;
     }
   }
@@ -41,13 +37,25 @@ export function validateLayouts(layouts) {
       // Each item must have required properties
       if (!item.i || typeof item.x !== 'number' || typeof item.y !== 'number' || 
           typeof item.w !== 'number' || typeof item.h !== 'number') {
-        console.error(`Invalid layouts item in ${breakpoint}:`, item);
+        if (isDev) console.error(`Invalid layouts item in ${breakpoint}:`, item);
         return false;
       }
     }
   }
   
   return true;
+}
+
+/**
+ * Creates empty layouts with all breakpoints initialized
+ * @returns {Object} Empty layouts object
+ */
+export function createEmptyLayouts() {
+  const emptyLayouts = {};
+  BREAKPOINTS.forEach(bp => {
+    emptyLayouts[bp] = [];
+  });
+  return emptyLayouts;
 }
 
 /**
@@ -58,10 +66,41 @@ export function getLayoutsFromStorage() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
-    return hydrateLayoutsFromDB(stored);
+    
+    try {
+      // Parse stored data
+      const parsedLayouts = JSON.parse(stored);
+      
+      // Ensure proper structure
+      const result = createEmptyLayouts();
+      
+      // Copy valid arrays for each breakpoint
+      BREAKPOINTS.forEach(bp => {
+        if (Array.isArray(parsedLayouts[bp])) {
+          result[bp] = parsedLayouts[bp];
+        }
+      });
+      
+      return result;
+    } catch (parseError) {
+      errorHandler.showError(
+        `Failed to parse layouts from localStorage: ${parseError.message}`,
+        ErrorType.SYSTEM,
+        ErrorSeverity.MEDIUM,
+        {
+          componentName: 'LayoutManager',
+          action: 'getLayoutsFromStorage',
+          location: 'Layouts Loading',
+          metadata: {
+            errorStack: parseError.stack
+          }
+        }
+      );
+      return null;
+    }
   } catch (err) {
     errorHandler.showError(
-      `Failed to parse layouts from localStorage: ${err.message}`,
+      `Failed to access localStorage: ${err.message}`,
       ErrorType.SYSTEM,
       ErrorSeverity.MEDIUM,
       {
@@ -78,6 +117,54 @@ export function getLayoutsFromStorage() {
 }
 
 /**
+ * Validates an individual layout item
+ * @param {Object} item - Layout item to validate
+ * @returns {boolean} True if item is valid
+ */
+export function isValidLayoutItem(item) {
+  return (
+    item && 
+    typeof item === 'object' &&
+    typeof item.i === 'string' && 
+    item.i.length > 0 &&
+    typeof item.x === 'number' &&
+    typeof item.y === 'number' &&
+    typeof item.w === 'number' &&
+    typeof item.h === 'number'
+  );
+}
+
+/**
+ * Prepares layouts for storage by cleaning and removing invalid items
+ * @param {Object} layouts - The layouts to sanitize
+ * @returns {Object} Sanitized layouts for storage
+ */
+export function sanitizeLayoutsForStorage(layouts) {
+  // Ensure we have valid layouts
+  if (!layouts || typeof layouts !== 'object') {
+    return createEmptyLayouts();
+  }
+  
+  const sanitized = {};
+  
+  // Process each breakpoint
+  BREAKPOINTS.forEach(bp => {
+    const items = layouts[bp];
+    
+    // Ensure breakpoint is an array
+    if (!Array.isArray(items)) {
+      sanitized[bp] = [];
+      return;
+    }
+    
+    // Filter valid items only
+    sanitized[bp] = items.filter(item => isValidLayoutItem(item));
+  });
+  
+  return sanitized;
+}
+
+/**
  * Saves layouts to localStorage
  * @param {Object} layouts - The layouts to save
  * @returns {boolean} Success status
@@ -86,7 +173,7 @@ export function saveLayoutsToLocal(layouts) {
   try {
     // Validate layouts before saving
     if (!validateLayouts(layouts)) {
-      console.error('Cannot save invalid layouts');
+      if (isDev) console.error('Cannot save invalid layouts');
       return false;
     }
     
@@ -111,7 +198,6 @@ export function saveLayoutsToLocal(layouts) {
     return false;
   }
 }
-
 /**
  * Saves layouts and active modules to backend session storage
  * @param {Object} layouts - The layouts to save
@@ -120,129 +206,46 @@ export function saveLayoutsToLocal(layouts) {
  */
 export async function saveLayoutsToSession(layouts, activeModules = []) {
   try {
-    // Detailed validation before sending
+    // Create default layouts if not provided
     if (!layouts) {
-      console.error('saveLayoutsToSession: Layouts is null or undefined');
-      
-      // Create default empty layouts instead of returning null
-      layouts = { lg: [], md: [], sm: [], xs: [], xxs: [] };
-      
-      errorHandler.showError(
-        'saveLayoutsToSession: Layouts is null or undefined',
-        ErrorType.SYSTEM,
-        ErrorSeverity.MEDIUM,
-        {
-          componentName: 'LayoutManager',
-          action: 'saveLayoutsToSession',
-          location: 'Layouts Validation'
-        }
-      );
+      layouts = createEmptyLayouts();
     }
     
-    console.log('saveLayoutsToSession: Initial layouts state', {
-      hasKeys: Object.keys(layouts).length > 0,
-      hasBreakpoints: BREAKPOINTS.some(bp => layouts[bp] !== undefined),
-      type: typeof layouts
-    });
-    
-    // Normalize the layouts through our validation function
-    layouts = normalizeLayouts(layouts);
-    
-    // Check if the normalized layouts are valid
-    const isValid = isValidResponsiveLayout(layouts, false);
-    
-    if (!isValid) {
-      errorHandler.showError(
-        'saveLayoutsToSession: No valid breakpoints found in layouts',
-        ErrorType.SYSTEM,
-        ErrorSeverity.MEDIUM,
-        {
-          componentName: 'LayoutManager',
-          action: 'saveLayoutsToSession',
-          location: 'Breakpoint Validation',
-          metadata: {
-            providedKeys: layouts ? Object.keys(layouts) : [],
-            layoutsType: typeof layouts,
-            layoutsIsArray: Array.isArray(layouts)
-          }
-        }
-      );
-      return null;
+    // Validate layouts instead of normalizing
+    if (!validateLayouts(layouts)) {
+      throw new Error('Invalid grid layout structure');
     }
+
+    // Filter invalid active modules
+    activeModules = Array.isArray(activeModules) ? 
+      activeModules.filter(id => id && typeof id === 'string' && id.split('-').length === 3) : 
+      [];
     
-    // Use sanitization function from imports
-    const safe = sanitizeLayoutsForStorage(layouts);
-    
-    // Create the payload with both layouts and active modules
-    // STRICT: Ensure grid_layout only contains arrays for each breakpoint
-    const grid_layout = {
-      lg: Array.isArray(safe.lg) ? safe.lg : [],
-      md: Array.isArray(safe.md) ? safe.md : [],
-      sm: Array.isArray(safe.sm) ? safe.sm : [],
-      xs: Array.isArray(safe.xs) ? safe.xs : [],
-      xxs: Array.isArray(safe.xxs) ? safe.xxs : []
-    };
-    
-    // Verify that all breakpoints are arrays before sending
-    BREAKPOINTS.forEach(bp => {
-      if (!Array.isArray(grid_layout[bp])) {
-        console.error(`Failed to ensure array format for ${bp} in saveLayoutsToSession`);
-        grid_layout[bp] = [];
-      }
-    });
-    
+    // Prepare payload with proper format
     const payload = {
-      grid_layout,
-      active_modules: Array.isArray(activeModules) ? activeModules : []
+      grid_layout: layouts,
+      active_modules: activeModules
     };
     
-    // Detailed logging for troubleshooting
-    console.log('Saving layouts and active modules to session:', JSON.stringify(payload));
+    console.log('Saving layouts to session:', {
+      layoutsCount: countLayoutsItems(layouts),
+      activeModulesCount: activeModules.length
+    });
     
-    // Make API call with retry logic
-    let attempt = 0;
-    const maxAttempts = 3;
+    // Make API call with retry
+    const response = await fetchWithRetry('/api/user/session/grid', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    }, 3); // 3 retry attempts
     
-    while (attempt < maxAttempts) {
-      attempt++;
-      
-      try {
-        const res = await fetch('/api/user/session/grid', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(payload)
-        });
-        
-        // Handle HTTP errors
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error(`HTTP ${res.status}: ${errorText}`);
-          
-          if (attempt < maxAttempts) {
-            console.log(`Retrying layouts save (attempt ${attempt + 1}/${maxAttempts})...`);
-            await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
-            continue;
-          }
-          
-          throw new Error(`Server error: HTTP ${res.status}`);
-        }
-        
-        // Parse response
-        const data = await res.json();
-        console.log('Layouts successfully synced to session:', data);
-        return data;
-      } catch (fetchErr) {
-        if (attempt < maxAttempts) {
-          console.log(`Network error, retrying (${attempt + 1}/${maxAttempts})...`);
-          await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
-        } else {
-          throw fetchErr; // Re-throw on final attempt
-        }
-      }
+    if (!response.ok) {
+      throw new Error(`Server error: HTTP ${response.status}`);
     }
     
-    throw new Error('Failed after maximum retry attempts');
+    const data = await response.json();
+    return data;
   } catch (err) {
     errorHandler.showError(
       `Failed to sync layouts to session: ${err.message}`,
@@ -260,6 +263,31 @@ export async function saveLayoutsToSession(layouts, activeModules = []) {
     
     return null;
   }
+}
+
+/**
+ * Helper function for fetch with retry logic
+ * @param {string} url - The URL to fetch
+ * @param {Object} options - Fetch options
+ * @param {number} maxAttempts - Maximum retry attempts
+ * @returns {Promise<Response>} Fetch response
+ */
+async function fetchWithRetry(url, options, maxAttempts = 3) {
+  let lastError;
+  
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fetch(url, options);
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxAttempts - 1) {
+        // Wait with exponential backoff before retry
+        await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt)));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Failed after maximum retry attempts');
 }
 
 // Debounced version to prevent excessive saves during drag operations
@@ -280,62 +308,42 @@ export function countLayoutsItems(layouts) {
 }
 
 /**
- * Core layouts resolution logic - determines which layouts to use based on priority
- * @param {Object} options - Options object
- * @param {Object} options.sessionData - Session data from server
- * @param {Array} options.items - Available module items
- * @returns {Promise<Object>} The resolved layouts
- */
-export async function resolveLayouts({ sessionData, items }) {
-  if (!sessionData || !sessionData.grid_layout) {
-    console.error('No valid session data or grid_layout provided to resolveLayouts');
-    throw new Error('No valid session data or grid_layout provided');
-  }
-  
-  // Transform and validate the layouts using LayoutTransformer
-  return await transformLayouts({ sessionData, items });
-}
-
-/**
  * Load layouts during application initialization
  * @param {Array} items - Available module items
- * @param {Object} [providedSessionData] - Optional session data to use instead of fetching from registry
+ * @param {Object} [providedSessionData] - Optional session data to use instead of fetching
  * @returns {Promise<Object>} The resolved layouts
  */
 export async function loadLayouts(items = [], providedSessionData = null) {
-  console.log('Loading layouts for items:', items.length);
-  
   try {
-    // Use provided session data only - should come from SettingsContext
+    // Use provided session data
     const sessionData = providedSessionData;
     
-    // Check both sessionData existence and whether it has any useful data
-    if (!sessionData || (typeof sessionData === 'object' && Object.keys(sessionData).length === 0)) {
-      console.warn('No session data provided to loadLayouts - creating empty layouts');
-      const emptyLayouts = createEmptyLayouts();
-      console.log('Created empty layouts with breakpoints:', Object.keys(emptyLayouts).join(', '));
-      return emptyLayouts;
-    }
-    
-    console.log('Processing session data for layouts:', {
-      hasGridLayout: !!sessionData.grid_layout,
-      sessionKeys: Object.keys(sessionData)
-    });
-    
-    // Transform and validate the layouts
-    const layouts = await transformLayouts({ 
-      sessionData, 
-      items
-    });
-    
-    if (!layouts) {
-      console.warn('transformLayouts returned null or undefined');
+    // No session data - return empty layouts
+    if (!sessionData || Object.keys(sessionData).length === 0) {
       return createEmptyLayouts();
     }
     
-    return layouts;
+    // Get layouts from session data - use as-is, no normalization
+    const gridLayout = sessionData.grid_layout;
+    
+    // If we have valid grid layout, use it directly without normalization
+    if (gridLayout && typeof gridLayout === 'object') {
+      // Verify all required breakpoints exist
+      const safeLayout = { ...gridLayout };
+      
+      // Add any missing breakpoints (but don't modify existing ones)
+      BREAKPOINTS.forEach(bp => {
+        if (!Array.isArray(safeLayout[bp])) {
+          safeLayout[bp] = [];
+        }
+      });
+      
+      return safeLayout;
+    }
+    
+    // No valid layouts found - create empty layouts
+    return createEmptyLayouts();
   } catch (error) {
-    console.error('Error in loadLayouts:', error);
     errorHandler.showError(
       `Failed to load layouts: ${error.message}`,
       ErrorType.SYSTEM,
@@ -357,163 +365,34 @@ export async function loadLayouts(items = [], providedSessionData = null) {
 }
 
 /**
- * Validates an individual layout item
- * @param {Object} item - Layout item to validate
- * @returns {boolean} True if item is valid
+ * List all saved layouts for the current user
+ * @returns {Promise<Array>} Array of saved layouts
  */
-export function isValidLayoutItem(item) {
-  return (
-    item && 
-    typeof item === 'object' &&
-    typeof item.i === 'string' && 
-    item.i.length > 0 &&
-    typeof item.x === 'number' &&
-    typeof item.y === 'number' &&
-    typeof item.w === 'number' &&
-    typeof item.h === 'number'
-  );
-}
-
-/**
- * Ensures a layouts has all breakpoints and only contains valid items
- * @param {Object} layouts - Layouts to normalize
- * @returns {Object} Normalized layouts
- */
-export function normalizeLayouts(layouts) {
-  const safeLayouts = {};
-
-  BREAKPOINTS.forEach(bp => {
-    const items = layouts?.[bp];
-    safeLayouts[bp] = Array.isArray(items)
-      ? items.filter(item => isValidLayoutItem(item))
-      : [];
-  });
-
-  return safeLayouts;
-}
-
-/**
- * Process stored layouts data
- * @param {Object|string} storedLayouts - The layouts data to process
- * @returns {Object} Normalized layouts data
- */
-export function processStoredLayouts(storedLayouts) {
+export async function listSavedLayouts() {
   try {
-    // Parse JSON string if needed
-    if (typeof storedLayouts === 'string') {
-      try {
-        storedLayouts = JSON.parse(storedLayouts);
-      } catch (parseErr) {
-        errorHandler.showError(
-          `Failed to parse layouts JSON: ${parseErr.message}`,
-          ErrorType.SYSTEM,
-          ErrorSeverity.MEDIUM,
-          {
-            componentName: 'LayoutManager',
-            action: 'processStoredLayouts',
-            location: 'JSON Parsing',
-            metadata: {
-              stringLength: storedLayouts?.length,
-              errorStack: parseErr.stack
-            }
-          }
-        );
-        return normalizeLayouts({});
-      }
-    }
-    
-    // Check if the layouts is valid
-    if (!storedLayouts || typeof storedLayouts !== 'object') {
-      console.warn('Invalid layouts data:', storedLayouts);
-      return normalizeLayouts({});
-    }
-    
-    // Handle different storage formats
-    const convertedLayouts = {};
-    BREAKPOINTS.forEach(bp => {
-      // Initialize each breakpoint with an empty array
-      convertedLayouts[bp] = [];
-      
-      // Skip if no data for this breakpoint
-      if (!storedLayouts[bp]) return;
-      
-      // Handle array format
-      if (Array.isArray(storedLayouts[bp])) {
-        convertedLayouts[bp] = storedLayouts[bp];
-      }
-      // Handle object/dictionary format
-      else if (typeof storedLayouts[bp] === 'object') {
-        convertedLayouts[bp] = Object.values(storedLayouts[bp]);
-      }
-    });
-    
-    // Normalize and return the converted layouts
-    return normalizeLayouts(convertedLayouts);
-  } catch (err) {
-    errorHandler.showError(
-      `Error processing layouts data: ${err.message}`,
-      'SYSTEM',
-      'medium'
-    );
-    return normalizeLayouts({});
-  }
-}
-
-/**
- * Saves the current session as a named layout
- * @param {string} layoutName - Name for the saved layout
- * @returns {Promise<Object>} Response from the server
- */
-export async function saveSessionAsLayout(layoutName) {
-  if (!layoutName || typeof layoutName !== 'string' || layoutName.trim() === '') {
-    errorHandler.showError(
-      'Layout name must be a non-empty string',
-      ErrorType.SYSTEM,
-      ErrorSeverity.MEDIUM,
-      {
-        componentName: 'LayoutManager',
-        action: 'saveSessionAsLayout',
-        location: 'Input Validation'
-      }
-    );
-    return null;
-  }
-  
-  try {
-    // Make API call to save current session as a layout
-    const res = await fetch(`/api/user/layouts/from-session?layout_name=${encodeURIComponent(layoutName.trim())}`, {
-      method: 'POST',
+    const res = await fetch(`/api/user/layouts`, {
+      method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include'
     });
     
-    // Handle HTTP errors
     if (!res.ok) {
-      const errorText = await res.text();
-      console.error(`HTTP ${res.status}: ${errorText}`);
       throw new Error(`Server error: HTTP ${res.status}`);
     }
     
-    // Parse response
-    const data = await res.json();
-    console.log('Session successfully saved as layout:', data);
-    return data;
+    return await res.json();
   } catch (err) {
     errorHandler.showError(
-      `Failed to save session as layout: ${err.message}`,
+      `Failed to list saved layouts: ${err.message}`,
       ErrorType.SYSTEM,
       ErrorSeverity.MEDIUM,
       {
         componentName: 'LayoutManager',
-        action: 'saveSessionAsLayout',
-        location: 'Layout Creation',
-        metadata: {
-          layoutName,
-          errorStack: err.stack
-        }
+        action: 'listSavedLayouts',
+        errorStack: err.stack
       }
     );
-    return null;
+    return [];
   }
 }
 
@@ -538,26 +417,17 @@ export async function applyLayout(layoutId) {
   }
   
   try {
-    // Make API call to apply layout
     const res = await fetch(`/api/user/layouts/${layoutId}/apply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include'
     });
     
-    // Handle HTTP errors
     if (!res.ok) {
-      const errorText = await res.text();
-      console.error(`HTTP ${res.status}: ${errorText}`);
       throw new Error(`Server error: HTTP ${res.status}`);
     }
     
-    // Parse response
-    const data = await res.json();
-    console.log('Layout successfully applied to session:', data);
-    
-    // Return success result
-    return data;
+    return await res.json();
   } catch (err) {
     errorHandler.showError(
       `Failed to apply layout: ${err.message}`,
@@ -567,57 +437,10 @@ export async function applyLayout(layoutId) {
         componentName: 'LayoutManager',
         action: 'applyLayout',
         location: 'Layout Application',
-        metadata: {
-          layoutId,
-          errorStack: err.stack
-        }
+        layoutId,
+        errorStack: err.stack
       }
     );
     return null;
-  }
-}
-
-/**
- * List all saved layouts for the current user
- * @param {number} [offset=0] - Pagination offset
- * @param {number} [limit=50] - Pagination limit
- * @returns {Promise<Array>} Array of saved layouts
- */
-export async function listSavedLayouts(offset = 0, limit = 50) {
-  try {
-    // Make API call to list layouts
-    const res = await fetch(`/api/user/layouts?offset=${offset}&limit=${limit}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include'
-    });
-    
-    // Handle HTTP errors
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error(`HTTP ${res.status}: ${errorText}`);
-      throw new Error(`Server error: HTTP ${res.status}`);
-    }
-    
-    // Parse response
-    const layouts = await res.json();
-    return layouts;
-  } catch (err) {
-    errorHandler.showError(
-      `Failed to list saved layouts: ${err.message}`,
-      ErrorType.SYSTEM,
-      ErrorSeverity.MEDIUM,
-      {
-        componentName: 'LayoutManager',
-        action: 'listSavedLayouts',
-        location: 'Layout Listing',
-        metadata: {
-          offset,
-          limit,
-          errorStack: err.stack
-        }
-      }
-    );
-    return [];
   }
 }

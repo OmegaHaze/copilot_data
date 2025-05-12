@@ -1,6 +1,3 @@
-import { errorHandler } from '../../../Error-Handling/utils/errorHandler'
-import { ErrorType, ErrorSeverity } from '../../../Error-Handling/Diagnostics/types/errorTypes'
-
 /**
  * Manages the registration, loading, and lifecycle of all components in the dashboard.
  * Provides centralized component access while avoiding circular dependencies.
@@ -12,6 +9,7 @@ class ComponentRegistry {
     this.logoUrls = new Map();
     this.errors = new Map();
     this.loadPromises = new Map();
+    this.errorListener = null;
 
     this.moduleTypes = {
       SYSTEM: new Set(),
@@ -31,6 +29,39 @@ class ComponentRegistry {
   }
   
   /**
+   * Set error handling function to break circular dependency
+   * @param {Function} handlerFn - Error handler function
+   */
+  setErrorHandler(handlerFn) {
+    if (typeof handlerFn === 'function') {
+      this.errorListener = handlerFn;
+    }
+  }
+  
+  /**
+   * Internal method to report errors without direct dependency
+   * @param {string} message - Error message
+   * @param {string} errorType - Type of error
+   * @param {string} severity - Error severity 
+   * @param {Object} context - Error context
+   * @private
+   */
+  _reportError(message, errorType = 'SYSTEM', severity = 'MEDIUM', context = {}) {
+    // Log to console always
+    console.error(`ComponentRegistry: ${message}`, context);
+    
+    // If we have an error handler registered, use it
+    if (typeof this.errorListener === 'function') {
+      try {
+        this.errorListener(message, errorType, severity, context);
+      } catch (err) {
+        // Prevent error handler errors from breaking the registry
+        console.error('Error in registry error handler:', err);
+      }
+    }
+  }
+  
+  /**
    * Initialize the component registry
    * This method ensures the registry is properly set up and only initialized once
    * @returns {Promise<boolean>} True if initialization succeeds
@@ -46,41 +77,26 @@ class ComponentRegistry {
       return Promise.resolve(true);
     }
     
-    console.log('Initializing ComponentRegistry...');
-    
-    // Create and store initialization promise
+    // Simple initialization without complex promise chains
     this.initializationPromise = Promise.resolve()
       .then(() => {
-        // Set initialized flag
         this.initialized = true;
-        console.log('ComponentRegistry initialized successfully');
         return true;
       })
       .catch(error => {
-        console.error('Failed to initialize ComponentRegistry:', error);
-        
-        // Report error to notification system
-        errorHandler.showError(
-          `Component registry initialization failed: ${error.message}`,
-          ErrorType.SYSTEM,
-          ErrorSeverity.HIGH,
+        this._reportError(
+          `Initialization failed: ${error.message}`,
+          'SYSTEM', 
+          'HIGH',
           {
-            componentName: 'ComponentRegistry',
             action: 'initialize',
-            location: 'Registry Initialization',
-            metadata: {
-              error: error.toString(),
-              stack: error.stack
-            }
+            error
           }
         );
-        
-        // Even on error, mark as initialized to prevent repeated attempts
-        this.initialized = true;
+        this.initialized = true; // Mark as initialized even on error
         return false;
       })
       .finally(() => {
-        // Clear initialization promise reference
         this.initializationPromise = null;
       });
     
@@ -113,117 +129,34 @@ class ComponentRegistry {
   }
 
   /**
-   * Load a component dynamically with proper error handling
-   * @param {string} moduleType - The module type to load
-   * @param {string} [componentName=null] - Optional component name
-   * @returns {Promise<Function|null>} - The component constructor or null if failed
+   * Register an instance of a module
+   * @param {string} moduleType - The module type
+   * @param {string} instanceId - The instance ID
+   * @returns {string} The full pane ID
    */
-  async loadComponent(moduleType, componentName = null) {
-    // Handle empty or invalid moduleType gracefully
-    if (!moduleType) {
-      console.warn('loadComponent called with empty moduleType');
-      return null;
+  registerInstance(moduleType, instanceId) {
+    // Fix: Add input validation
+    if (!moduleType || !instanceId) {
+      console.warn('Invalid moduleType or instanceId for registerInstance');
+      return '';
     }
-
+    
     const key = this.getCanonicalKey(moduleType);
-
-    // Return from cache if available
-    if (this.components.has(key)) {
-      return this.components.get(key);
+    if (!this.instances.has(key)) {
+      this.instances.set(key, new Set());
     }
-
-    // Return in-progress loading promise if exists
-    if (this.loadPromises.has(key)) {
-      return this.loadPromises.get(key);
-    }
-
-    // If this component previously had an error, clear it before retrying
-    if (this.errors.has(key)) {
-      this.errors.delete(key);
-    }
-
-    const compName = componentName || this.getComponentName(key);
-
-    // Create and store the loading promise
-    const loadPromise = (async () => {
-      try {
-        console.log(`Loading component for ${compName}`);
-
-        // Try to dynamically import the component - try multiple possible paths
-        let module;
-        try {
-          // First try original path
-          module = await import(`../Pane/${compName}Pane.jsx`);
-        } catch (pathError) {
-          console.log(`Failed to load from ../Pane/${compName}Pane.jsx, trying alternatives...`);
-          
-          try {
-            // Try without Pane suffix
-            module = await import(`../Pane/${compName}.jsx`);
-          } catch (alternativeError) {
-            // Try parent directory
-            console.log(`Failed to load from ../Pane/${compName}.jsx, trying parent...`);
-            module = await import(`../../${compName}/${compName}Pane.jsx`);
-          }
-        }
-        
-        const Component = module.default || module;
-
-        // Verify the component is valid
-        if (!Component || typeof Component !== 'function') {
-          throw new Error(`Invalid component format for "${compName}"`);
-        }
-
-        // Register the successfully loaded component
-        this.register(key, Component);
-
-        return Component;
-      } catch (err) {
-        // Record error details
-        const errorDetails = {
-          error: err.message,
-          timestamp: new Date().toISOString(),
-          component: compName,
-        };
-        this.errors.set(key, errorDetails);
-
-        // Show error information
-        errorHandler.showError(
-          `Component registration failed: ${compName} → ${err.message}`,
-          ErrorType.UI,
-          ErrorSeverity.MEDIUM,
-          {
-            componentName: 'ComponentRegistry',
-            action: 'loadComponent',
-            location: 'Module Loading',
-            metadata: {
-              moduleType,
-              componentName: compName,
-              key,
-              error: err.toString(),
-              stack: err.stack
-            },
-          }
-        );
-
-        return null;
-      }
-    })()
-    .finally(() => {
-      // Clean up promise map after resolution (success or failure)
-      this.loadPromises.delete(key);
-    });
-
-    this.loadPromises.set(key, loadPromise);
-    return loadPromise;
+    this.instances.get(key).add(instanceId);
+    return `${key}-${instanceId}`;
   }
-  
+
   /**
    * Get a component by module type
    * @param {string} moduleType - The module type
    * @returns {Function|null} The component constructor or null
    */
   getComponent(moduleType) {
+    // Fix: Add null check for moduleType
+    if (!moduleType) return null;
     return this.components.get(this.getCanonicalKey(moduleType)) || null;
   }
 
@@ -233,22 +166,9 @@ class ComponentRegistry {
    * @returns {boolean} True if the component is registered
    */
   hasComponent(moduleType) {
+    // Fix: Add null check for moduleType
+    if (!moduleType) return false;
     return this.components.has(this.getCanonicalKey(moduleType));
-  }
-
-  /**
-   * Register an instance of a module
-   * @param {string} moduleType - The module type
-   * @param {string} instanceId - The instance ID
-   * @returns {string} The full pane ID
-   */
-  registerInstance(moduleType, instanceId) {
-    const key = this.getCanonicalKey(moduleType);
-    if (!this.instances.has(key)) {
-      this.instances.set(key, new Set());
-    }
-    this.instances.get(key).add(instanceId);
-    return `${key}-${instanceId}`;
   }
 
   /**
@@ -286,6 +206,9 @@ class ComponentRegistry {
    * @returns {string} The component name
    */
   getComponentName(moduleType) {
+    // Fix: Add null check for moduleType
+    if (!moduleType) return '';
+    
     // Get canonical key without assuming specific naming conventions
     const key = this.getCanonicalKey(moduleType);
     
@@ -299,6 +222,7 @@ class ComponentRegistry {
    * @returns {string} The canonical key
    */
   getCanonicalKey(moduleType) {
+    // Fix: Improved null/undefined handling
     if (!moduleType) return '';
     
     // Handle non-string input safely
@@ -317,6 +241,12 @@ class ComponentRegistry {
    * @returns {string} The pane ID in format: MODULETYPE-STATICID-INSTANCEID
    */
   createPaneId(moduleType, staticIdentifier, instanceId) {
+    // Fix: Add input validation
+    if (!moduleType || !staticIdentifier) {
+      console.warn('Both moduleType and staticIdentifier are required for createPaneId');
+      return '';
+    }
+    
     const type = this.getCanonicalKey(moduleType);
     const instance = instanceId || this.generateInstanceId();
     return `${type}-${staticIdentifier}-${instance}`;
@@ -327,7 +257,8 @@ class ComponentRegistry {
    * @returns {string} A random instance ID
    */
   generateInstanceId() {
-    return Math.random().toString(36).substring(2, 8);
+    // Fix: More reliable ID generation than Math.random().toString(36).substring(2, 8)
+    return Date.now().toString(36) + Math.floor(Math.random() * 10000).toString(36);
   }
 
   /**
@@ -360,14 +291,17 @@ class ComponentRegistry {
    * @param {string} category - The category (SYSTEM, SERVICE, USER)
    */
   setCategoryForModule(moduleType, category) {
+    // Fix: Add null check for moduleType
+    if (!moduleType || !category) return;
+    
     const key = this.getCanonicalKey(moduleType);
     // Make sure category is uppercase
     const upperCategory = category.toUpperCase();
     if (!['SYSTEM', 'SERVICE', 'USER'].includes(upperCategory)) {
-      errorHandler.showError(
+      this._reportError(
         `Invalid module category: ${upperCategory}`,
-        ErrorType.SYSTEM,
-        ErrorSeverity.MEDIUM,
+        'SYSTEM',
+        'MEDIUM',
         {
           componentName: 'ComponentRegistry',
           action: 'setCategoryForModule',
@@ -394,6 +328,9 @@ class ComponentRegistry {
    * @returns {string} The category (SYSTEM, SERVICE, USER) or 'unknown'
    */
   getCategoryForModule(moduleType) {
+    // Fix: Add null check for moduleType
+    if (!moduleType) return 'unknown';
+    
     const key = this.getCanonicalKey(moduleType);
     for (const [category, modules] of Object.entries(this.moduleTypes)) {
       if (modules.has(key)) return category;
@@ -437,16 +374,134 @@ class ComponentRegistry {
   }
 
   /**
+   * Load a component dynamically by module type
+   * @param {string} moduleType - The module type or name
+   * @param {string} [componentName] - Optional custom component name, default derived from moduleType
+   * @param {boolean} [forceReload=false] - Whether to force reload even if already loaded
+   * @returns {Promise<Function|null>} - The loaded component or null on failure
+   */
+  async loadComponent(moduleType, componentName, forceReload = false) {
+    if (!moduleType) {
+      this._reportError('Cannot load component: moduleType is required', 'SYSTEM', 'MEDIUM');
+      return null;
+    }
+    
+    const key = this.getCanonicalKey(moduleType);
+    
+    // If already loaded and not forcing reload, return cached component
+    if (!forceReload && this.components.has(key)) {
+      return this.components.get(key);
+    }
+    
+    // If there's an ongoing load, return that promise
+    if (this.loadPromises.has(key) && !forceReload) {
+      return this.loadPromises.get(key);
+    }
+    
+    // Determine which component name to load (explicit or derived from moduleType)
+    const finalComponentName = componentName || this.getComponentName(key);
+    
+    // Create a promise to load the component
+    const loadPromise = (async () => {
+      try {
+        console.log(`Loading component: ${key} (${finalComponentName})`);
+        
+        // First try loading from correct module type directory
+        let component = null;
+        const category = this.getCategoryForModule(key) || 'SYSTEM';
+        
+        try {
+          // Primary path: look in the Pane directory first since that's where our components are
+          const path = `./Pane/${finalComponentName}.jsx`;
+          console.log(`Attempting to import from: ${path}`);
+          const module = await import(/* @vite-ignore */ path);
+          component = module.default;
+        } catch (moduleErr) {
+          console.error(`Failed to load component ${finalComponentName}:`, moduleErr);
+          throw new Error(`Component ${finalComponentName} not found in primary location`);
+        }
+        
+        if (!component || typeof component !== 'function') {
+          throw new Error(`Loaded module for ${finalComponentName} is not a valid component`);
+        }
+        
+        // Store the component in the registry
+        this.components.set(key, component);
+        this.clearError(key);
+        
+        console.log(`Successfully loaded component: ${key}`);
+        return component;
+      } catch (err) {
+        // Store error for diagnostics
+        this.errors.set(key, {
+          error: err.message,
+          timestamp: new Date().toISOString(),
+          componentName: finalComponentName
+        });
+        
+        // Report error through handler
+        this._reportError(`Failed to load component ${finalComponentName}: ${err.message}`, 'SYSTEM', 'MEDIUM', {
+          moduleType: key,
+          componentName: finalComponentName,
+          error: err
+        });
+        
+        throw err;
+      } finally {
+        // Clean up the promise regardless of outcome
+        this.loadPromises.delete(key);
+      }
+    })();
+    
+    // Store the promise for future reference
+    this.loadPromises.set(key, loadPromise);
+    
+    return loadPromise;
+  }
+
+  /**
+   * Load multiple modules from their IDs
+   * @param {Array<string>} moduleIds - Array of module IDs (e.g., ["SYSTEM-SupervisorPane-123"])
+   * @returns {Promise<Array>} - Array of results
+   */
+  async loadModulesFromIds(moduleIds) {
+    if (!Array.isArray(moduleIds) || moduleIds.length === 0) {
+      return [];
+    }
+    
+    console.log(`Loading ${moduleIds.length} modules from IDs:`, moduleIds);
+    
+    const loadPromises = moduleIds.map(id => {
+      // Extract module type from ID
+      const parts = id.split('-');
+      if (parts.length < 1) return Promise.resolve(null);
+      
+      const moduleType = parts[0];
+      const staticIdentifier = parts.length > 1 ? parts[1] : null;
+      
+      // Queue loading the component
+      return this.loadComponent(moduleType)
+        .catch(err => {
+          console.warn(`Failed to load module ${id}:`, err);
+          return null;
+        });
+    });
+    
+    return Promise.all(loadPromises);
+  }
+
+  /**
    * Set module data for all categories
    * @param {Object} data - Module data organized by category
    */
   setModuleData(data) {
-    if (!data) return;
+    // Fix: Add stronger validation for data
+    if (!data || typeof data !== 'object') return;
     
     // Update module data for each category
     ['SYSTEM', 'SERVICE', 'USER'].forEach(upperCat => {
       // Only use uppercase keys
-      if (data[upperCat]) {
+      if (data[upperCat] && Array.isArray(data[upperCat])) {
         this.moduleData[upperCat] = data[upperCat];
       }
     });
@@ -455,12 +510,14 @@ class ComponentRegistry {
     ['SYSTEM', 'SERVICE', 'USER'].forEach(upperCat => {
       // Only look for uppercase keys
       const categoryData = data[upperCat] || [];
-      categoryData.forEach(mod => {
-        if (!mod) return;
-        
-        const key = this.getCanonicalKey(mod.module || mod.name);
-        if (key) this.moduleTypes[upperCat].add(key);
-      });
+      if (Array.isArray(categoryData)) {
+        categoryData.forEach(mod => {
+          if (!mod) return;
+          
+          const key = this.getCanonicalKey(mod.module || mod.name);
+          if (key) this.moduleTypes[upperCat].add(key);
+        });
+      }
     });
   }
   
@@ -493,133 +550,114 @@ class ComponentRegistry {
    */
   synchronizeWithSessionData(sessionData) {
     if (!sessionData || typeof sessionData !== 'object') {
-      console.warn('Cannot synchronize with invalid session data');
+      this.logError('Cannot synchronize with invalid session data', {action: 'synchronizeWithSessionData'});
       return false;
     }
 
     try {
-      console.log('Synchronizing component registry with session data', {
-        hasActiveModules: !!sessionData.active_modules,
-        hasGridLayout: !!sessionData.grid_layout,
-        keys: Object.keys(sessionData)
-      });
+      // Extract active modules from session data
+      const activeModules = sessionData.active_modules;
+      if (!Array.isArray(activeModules) || activeModules.length === 0) {
+        return true; // No modules to process is valid state
+      }
       
-      // Process active modules if available
-      if (sessionData.active_modules && Array.isArray(sessionData.active_modules)) {
-        console.log(`Found ${sessionData.active_modules.length} active modules in session`);
+      // Filter and process valid modules
+      const validModules = this.extractValidModuleIds(activeModules);
+      if (validModules.length === 0) {
+        return true; // No valid modules to process
+      }
+      
+      // Process valid modules
+      this.loadModulesFromIds(validModules);
+      
+      // Check if grid_layout is present and has valid data
+      if (sessionData.grid_layout && typeof sessionData.grid_layout === 'object') {
+        const breakpoints = ['lg', 'md', 'sm', 'xs', 'xxs'];
+        let hasLayoutItems = false;
         
-        // Filter valid modules (must use three-part ID format)
-        const validModules = sessionData.active_modules.filter(moduleId => {
-          // Basic validation
-          if (!moduleId || typeof moduleId !== 'string') {
-            console.error(`Invalid module ID: ${moduleId}. Must be a non-empty string.`);
-            return false;
-          }
-          
-          // Format validation
-          const parts = moduleId.split('-');
-          if (parts.length !== 3) {
-            console.error(`Invalid module ID format: ${moduleId}. Expected MODULETYPE-STATICID-INSTANCEID`);
-            return false;
-          }
-          
-          // Module type validation
-          const moduleType = parts[0].toUpperCase();
-          if (!['SYSTEM', 'SERVICE', 'USER'].includes(moduleType)) {
-            console.error(`Invalid module type in ID: ${moduleId}. Type must be SYSTEM, SERVICE, or USER`);
-            return false;
-          }
-          
-          return true;
-        });
-        
-        console.log(`Found ${validModules.length} valid modules out of ${sessionData.active_modules.length} total`);
-        
-        // Extract module types from valid module IDs (always using uppercase)
-        const extractedModuleTypes = validModules
-          .map(id => id.split('-')[0].toUpperCase())
-          .filter(Boolean);
-          
-        // Add to appropriate module type collections
-        extractedModuleTypes.forEach(type => {
-          if (type === 'SYSTEM') this.moduleTypes.SYSTEM.add(type);
-          else if (type === 'SERVICE') this.moduleTypes.SERVICE.add(type);
-          else if (type === 'USER') this.moduleTypes.USER.add(type);
-        });
-        
-        // Queue loading of components for valid modules
-        validModules.forEach(moduleId => {
-          const parts = moduleId.split('-');
-          const moduleType = parts[0].toUpperCase();
-          
-          if (!this.hasComponent(moduleType)) {
-            // Queue loading this component
-            this.loadComponent(moduleType);
+        // Check if any breakpoint has layout items
+        breakpoints.forEach(bp => {
+          if (Array.isArray(sessionData.grid_layout[bp]) && 
+              sessionData.grid_layout[bp].length > 0) {
+            hasLayoutItems = true;
           }
         });
-      } else {
-        console.warn('No active modules in session data');
+        
+        if (hasLayoutItems) {
+          // Track all module types from grid layout items
+          breakpoints.forEach(bp => {
+            if (Array.isArray(sessionData.grid_layout[bp])) {
+              sessionData.grid_layout[bp].forEach(item => {
+                if (item && item.i) {
+                  const parts = item.i.split('-');
+                  if (parts.length === 3) {
+                    const moduleType = parts[0].toUpperCase();
+                    if (['SYSTEM', 'SERVICE', 'USER'].includes(moduleType)) {
+                      this.moduleTypes[moduleType].add(moduleType);
+                    }
+                  }
+                }
+              });
+            }
+          });
+        }
       }
       
       return true;
     } catch (error) {
-      console.error('Error synchronizing with session data:', error);
-      errorHandler.showError(
-        `Failed to synchronize registry with session data: ${error.message}`,
-        ErrorType.SYSTEM,
-        ErrorSeverity.MEDIUM,
-        {
-          componentName: 'ComponentRegistry',
-          action: 'synchronizeWithSessionData',
-          metadata: {
-            error: error.toString(),
-            stack: error.stack
-          }
-        }
-      );
+      this.logError(`Failed to synchronize registry with session data: ${error.message}`, {
+        action: 'synchronizeWithSessionData',
+        error
+      });
       return false;
     }
   }
   
   /**
-   * Check if the component registry is initialized
-   * @returns {boolean} True if the registry is initialized
+   * Extract valid module IDs from a list of potential module IDs
+   * @param {Array<string>} moduleIds - List of module IDs to process
+   * @returns {Array<string>} List of valid module IDs
    */
-  isInitialized() {
-    return this.initialized;
-  }
-  
-  /**
-   * Unregister an instance of a module
-   * @param {string} moduleType - The module type
-   * @param {string} instanceId - The instance ID
-   * @returns {boolean} True if the instance was unregistered
-   */
-  unregisterInstance(moduleType, instanceId) {
-    const key = this.getCanonicalKey(moduleType);
-    if (this.instances.has(key)) {
-      return this.instances.get(key).delete(instanceId);
+  extractValidModuleIds(moduleIds) {
+    if (!Array.isArray(moduleIds)) {
+      return [];
     }
-    return false;
+    
+    return moduleIds.filter(id => {
+      // Must be string and have the right format
+      if (typeof id !== 'string' || !id.includes('-')) {
+        return false;
+      }
+      
+      const parts = id.split('-');
+      // Must have at least module type and identifier
+      if (parts.length < 2) {
+        return false;
+      }
+      
+      const moduleType = parts[0].toUpperCase();
+      // Must be a valid module type
+      return ['SYSTEM', 'SERVICE', 'USER'].includes(moduleType);
+    });
   }
   
   /**
-   * Get metadata for a component
-   * @param {string} moduleType - The module type
-   * @returns {Object|null} Component metadata or null
+   * Log an error through the error handler
+   * @param {string} message - Error message
+   * @param {Object} context - Error context
    */
-  getMetadata(moduleType) {
-    const key = this.getCanonicalKey(moduleType);
-    const category = this.getCategoryForModule(key);
-    
-    // Find the module in the corresponding category data
-    const module = this.moduleData[category]?.find(m => 
-      this.getCanonicalKey(m.module || m.name) === key
-    );
-    
-    return module || null;
+  logError(message, context = {}) {
+    // Use the internal _reportError method with default parameters
+    this._reportError(message, 'SYSTEM', 'MEDIUM', context);
   }
 }
 
-// Create and export a singleton instance
-export const componentRegistry = new ComponentRegistry();
+// Singleton pattern - create only one instance
+let instance = null;
+
+export const componentRegistry = instance || (instance = new ComponentRegistry());
+
+// Hook up error handling in ComponentRegistryInitializer.js, not here
+// This breaks the circular dependency
+
+export default componentRegistry;

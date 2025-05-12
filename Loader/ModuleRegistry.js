@@ -1,20 +1,19 @@
 /**
- * Module Registry - Defines the classification for each module.
- * Uses ComponentRegistry as the single source of truth.
+ * Module Registry - Module classification utilities
+ * Uses ComponentRegistry for consistent module type handling
  */
 
-// Import the component registry
 import { componentRegistry } from './ComponentRegistry.js';
 
-// Module type constants for semantic clarity
+// Module type constants
 export const MODULE_TYPE = {
   SYSTEM: "SYSTEM",
   SERVICE: "SERVICE",
   USER: "USER"
 };
 
-// Default configurations for different module types
-export const MODULE_CONFIG = {
+// Module configuration map
+const MODULE_CONFIG = {
   [MODULE_TYPE.SYSTEM]: {
     isPersistent: true,    // System modules remain loaded
     allowMultiple: false,  // Only one instance allowed
@@ -31,31 +30,28 @@ export const MODULE_CONFIG = {
 
 /**
  * Get type of a module by key
- * Uses ComponentRegistry as the single source of truth
- * 
  * @param {string} moduleKey - Module identifier
- * @returns {"SYSTEM" | "SERVICE" | "USER"} - Module type
+ * @returns {string} - Module type (SYSTEM, SERVICE, USER)
  */
 export function getModuleType(moduleKey) {
   if (!moduleKey) return MODULE_TYPE.USER;
   
-  // Ensure module_type is uppercase wherever applicable
-  moduleKey = moduleKey.toUpperCase();
-
-  // Get category from ComponentRegistry (single source of truth)
+  // Get category from registry (single source of truth)
   const category = componentRegistry.getCategoryForModule(moduleKey);
   
-  // If valid category found, use it
-  if (category && ['SYSTEM', 'SERVICE', 'USER'].includes(category.toUpperCase())) {
-    return category.toUpperCase();
+  // Return valid category or default to USER
+  if (category && Object.values(MODULE_TYPE).includes(category)) {
+    return category;
   }
   
-  // Default to user module if not categorized
   return MODULE_TYPE.USER;
 }
 
 /**
  * Check if module matches a specific type
+ * @param {string} moduleKey - Module identifier
+ * @param {string} type - Type to check
+ * @returns {boolean} True if module matches type
  */
 export function isModule(moduleKey, type) {
   return getModuleType(moduleKey) === type;
@@ -63,17 +59,27 @@ export function isModule(moduleKey, type) {
 
 /**
  * Check if a module allows multiple instances
+ * @param {string} moduleKey - Module identifier
+ * @returns {boolean} True if multiple instances allowed
  */
 export function allowsMultipleInstances(moduleKey) {
   const type = getModuleType(moduleKey);
   return MODULE_CONFIG[type]?.allowMultiple || false;
 }
 
-// Delegate core functions directly to ComponentRegistry
-export const getBaseModuleType = componentRegistry.getCanonicalKey.bind(componentRegistry);
+// Direct pass-through to ComponentRegistry for core functions
+export const getCanonicalKey = componentRegistry.getCanonicalKey.bind(componentRegistry);
 export const generateInstanceId = componentRegistry.generateInstanceId.bind(componentRegistry);
 export const createPaneId = componentRegistry.createPaneId.bind(componentRegistry);
-export const getInstanceId = (paneId) => {
+
+/**
+ * Extract instance ID from pane ID
+ * @param {string} paneId - Full pane ID
+ * @returns {string|null} Instance ID or null
+ */
+export function getInstanceId(paneId) {
   if (!paneId || !paneId.includes("-")) return null;
-  return paneId.split("-")[1];
-};
+  
+  const parts = paneId.split("-");
+  return parts.length > 1 ? parts[parts.length - 1] : null;
+}

@@ -5,8 +5,7 @@
 
 import { cols, findFirstAvailablePosition, DEFAULT_WIDTH, DEFAULT_HEIGHT } from './GridUtils.js';
 
-// Module-specific default sizes - using GridUtils defaults
-// Module types are stored in uppercase to match Python's enum
+// Module-specific default sizes mapped by UPPERCASE module type
 const MODULE_SIZE_MAP = {
   'SYSTEM': { w: 12, h: 8 },     // Supervisor modules
   'SERVICE': { w: 12, h: 8 },    // Service modules like NVIDIA
@@ -18,15 +17,22 @@ const MODULE_SIZE_MAP = {
   'default': { w: 12, h: 8 }
 };
 
+// Default minimum sizes for all module types
+const DEFAULT_MIN_SIZE = { w: 3, h: 3 };
+
 /**
  * Get default size for a specific module type
  * 
  * @param {string} moduleType - Type of module (SYSTEM, SERVICE, USER, etc.)
- * @returns {Object} Width and height configuration
+ * @returns {Object} Width and height configuration {w, h}
  */
 export function getModuleDefaultSize(moduleType) {
+  if (!moduleType) {
+    return MODULE_SIZE_MAP.default;
+  }
+  
   // Ensure moduleType is uppercase to match our MODULE_SIZE_MAP keys
-  const type = moduleType ? moduleType.toUpperCase() : 'default';
+  const type = moduleType.toUpperCase();
   return MODULE_SIZE_MAP[type] || MODULE_SIZE_MAP.default;
 }
 
@@ -40,16 +46,32 @@ export function getModuleDefaultSize(moduleType) {
  * @returns {Object} - { x, y } coordinates for optimal placement
  */
 export function getOptimalPosition(breakpoint, existingItems = [], newItemSize = { w: 12, h: 8 }) {
-  // Get column count for this breakpoint
-  const colCount = cols[breakpoint] || 12;
-  
-  // If no existing items, start at the origin
-  if (!existingItems || !existingItems.length) {
-    return { x: 0, y: 0 };
+  try {
+    // Validate breakpoint
+    if (!breakpoint || !cols[breakpoint]) {
+      console.warn(`Invalid breakpoint: ${breakpoint}, using lg`);
+      breakpoint = 'lg';
+    }
+    
+    // Get column count for this breakpoint
+    const colCount = cols[breakpoint] || cols.lg;
+    
+    // If no existing items, start at the origin
+    if (!existingItems || !Array.isArray(existingItems) || existingItems.length === 0) {
+      return { x: 0, y: 0 };
+    }
+    
+    // Validate newItemSize
+    if (!newItemSize || typeof newItemSize !== 'object') {
+      newItemSize = { w: DEFAULT_WIDTH, h: DEFAULT_HEIGHT };
+    }
+    
+    // Use the utility function from GridUtils to find the best position
+    return findFirstAvailablePosition(existingItems, colCount, newItemSize);
+  } catch (error) {
+    console.error('Error in getOptimalPosition:', error);
+    return { x: 0, y: 0 }; // Safe fallback
   }
-  
-  // Use the utility function from GridUtils to find the best position
-  return findFirstAvailablePosition(existingItems, colCount, newItemSize);
 }
 
 /**
@@ -61,43 +83,60 @@ export function getOptimalPosition(breakpoint, existingItems = [], newItemSize =
  * @returns {Object} - New layout item suitable for all breakpoints
  */
 export function createLayoutItemForAllBreakpoints(moduleType, staticIdentifier, currentLayouts) {
-  // Ensure moduleType is uppercase for Python enum compatibility
-  const type = moduleType.toUpperCase();
-  
-  // Generate a unique instance ID
-  const instanceId = Math.random().toString(36).substring(2, 8);
-  
-  // Create paneId in the three-part format: MODULETYPE-STATICID-INSTANCEID
-  const paneId = `${type}-${staticIdentifier}-${instanceId}`;
-  
-  const result = {};
-  
-  // Get default size based on module type
-  const defaultSize = getModuleDefaultSize(type);
-  
-  // Get all breakpoints from the current layouts or use defaults
-  const breakpoints = currentLayouts ? Object.keys(currentLayouts) : ['lg', 'md', 'sm', 'xs', 'xxs'];
-  
-  // Create layout for each breakpoint
-  breakpoints.forEach(bp => {
-    const existingItems = currentLayouts && currentLayouts[bp] ? currentLayouts[bp] : [];
-    const position = getOptimalPosition(bp, existingItems, defaultSize);
+  try {
+    // Input validation
+    if (!moduleType || !staticIdentifier) {
+      console.error('moduleType and staticIdentifier are required');
+      return {};
+    }
     
-    result[bp] = {
-      i: paneId,                        // Full three-part ID: MODULETYPE-STATICID-INSTANCEID
-      moduleType: type,                 // Uppercase module type (SYSTEM, SERVICE, USER)
-      staticIdentifier: staticIdentifier, // Static component identifier
-      instanceId: instanceId,           // Unique instance ID
-      x: position.x,
-      y: position.y,
-      w: defaultSize.w,
-      h: defaultSize.h,
-      minW: 3,
-      minH: 3
-    };
-  });
-  
-  return result;
+    if (!currentLayouts || typeof currentLayouts !== 'object') {
+      console.warn('Invalid currentLayouts, using empty layouts');
+      currentLayouts = { lg: [], md: [], sm: [], xs: [], xxs: [] };
+    }
+    
+    // Ensure moduleType is uppercase for consistency
+    const type = moduleType.toUpperCase();
+    
+    // Get all breakpoints from the current layouts or use defaults
+    const breakpoints = Object.keys(currentLayouts).length > 0 ? 
+                       Object.keys(currentLayouts) : 
+                       ['lg', 'md', 'sm', 'xs', 'xxs'];
+    
+    // Get default size based on module type
+    const defaultSize = getModuleDefaultSize(type);
+    
+    // Create layout items for each breakpoint
+    const result = {};
+    
+    breakpoints.forEach(bp => {
+      // Get existing items for this breakpoint (with validation)
+      const existingItems = Array.isArray(currentLayouts[bp]) ? 
+                          currentLayouts[bp] : 
+                          [];
+      
+      // Find optimal position
+      const position = getOptimalPosition(bp, existingItems, defaultSize);
+      
+      // Create layout item for this breakpoint
+      result[bp] = {
+        // Don't set 'i' property here - it will be set by the caller
+        moduleType: type,                 // Uppercase module type
+        staticIdentifier,                 // Static component identifier
+        x: position.x,
+        y: position.y,
+        w: defaultSize.w,
+        h: defaultSize.h,
+        minW: DEFAULT_MIN_SIZE.w,
+        minH: DEFAULT_MIN_SIZE.h
+      };
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('Error in createLayoutItemForAllBreakpoints:', error);
+    return {}; // Return empty object as fallback
+  }
 }
 
 /**
@@ -109,27 +148,49 @@ export function createLayoutItemForAllBreakpoints(moduleType, staticIdentifier, 
  * @returns {Object} - Updated layouts
  */
 export function updateLayoutItemSize(paneId, currentLayouts, newSize) {
-  if (!currentLayouts || !paneId) return currentLayouts;
-  
-  const result = { ...currentLayouts };
-  
-  // Update each breakpoint
-  Object.keys(result).forEach(bp => {
-    if (!result[bp]) return;
+  try {
+    // Input validation
+    if (!paneId || !currentLayouts || !newSize) {
+      console.warn('Missing required parameters for updateLayoutItemSize');
+      return currentLayouts;
+    }
     
-    result[bp] = result[bp].map(item => {
-      if (item.i === paneId) {
-        return {
-          ...item,
-          w: newSize.w ?? item.w,
-          h: newSize.h ?? item.h
-        };
+    if (typeof newSize !== 'object' || (typeof newSize.w !== 'number' && typeof newSize.h !== 'number')) {
+      console.warn('Invalid newSize object');
+      return currentLayouts;
+    }
+    
+    // Create a new layouts object to avoid mutating the original
+    const result = { ...currentLayouts };
+    
+    // Get list of breakpoints to update
+    const breakpoints = Object.keys(result);
+    
+    // Update each breakpoint
+    breakpoints.forEach(bp => {
+      if (!Array.isArray(result[bp])) {
+        result[bp] = [];
+        return;
       }
-      return item;
+      
+      // Map to new array to avoid mutating original
+      result[bp] = result[bp].map(item => {
+        if (item.i === paneId) {
+          return {
+            ...item,
+            w: typeof newSize.w === 'number' ? newSize.w : item.w,
+            h: typeof newSize.h === 'number' ? newSize.h : item.h
+          };
+        }
+        return item;
+      });
     });
-  });
-  
-  return result;
+    
+    return result;
+  } catch (error) {
+    console.error('Error in updateLayoutItemSize:', error);
+    return currentLayouts; // Return original layouts as fallback
+  }
 }
 
 /**
@@ -140,12 +201,27 @@ export function updateLayoutItemSize(paneId, currentLayouts, newSize) {
  * @returns {Object|null} - Found layout item or null
  */
 export function findLayoutItem(paneId, layouts) {
-  if (!layouts || !paneId) return null;
-  
-  for (const bp of Object.keys(layouts)) {
-    const items = layouts[bp] || [];
-    const found = items.find(item => item.i === paneId);
-    if (found) return found;
+  try {
+    // Input validation
+    if (!paneId || !layouts || typeof layouts !== 'object') {
+      return null;
+    }
+    
+    // Get list of breakpoints
+    const breakpoints = Object.keys(layouts);
+    
+    // Check each breakpoint for the item
+    for (const bp of breakpoints) {
+      const items = Array.isArray(layouts[bp]) ? layouts[bp] : [];
+      
+      // Find item with matching ID
+      const found = items.find(item => item && item.i === paneId);
+      if (found) return found;
+    }
+    
+    return null; // Not found in any breakpoint
+  } catch (error) {
+    console.error('Error in findLayoutItem:', error);
+    return null;
   }
-  return null;
 }
