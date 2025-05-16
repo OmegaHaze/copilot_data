@@ -48,12 +48,16 @@ The layout system exposes a clean API through `index.js`:
 - `validateLayout(layout)`: Validate layout structure
 - `transformLayout(layout)`: Transform layout for persistence
 - `getOptimalPosition(...)`: Find best position for new items
-- `addItemToLayout(layouts, item)`: Add a new item to layouts
-- `removeItemFromLayout(layouts, itemId)`: Remove item from layouts
-- `updateItemInLayout(layouts, item)`: Update existing item in layouts
+- `addModule(moduleId, moduleType, currentLayouts)`: Add a new module to layouts
+- `removeModule(moduleId, currentLayouts)`: Remove module from layouts
+- `saveLayoutTemplate(name, layouts, modules)`: Save layouts as a template
+- `getLayoutTemplates()`: Get all saved layout templates
+- `applyLayoutTemplate(id)`: Apply a template to current layout
 
 ## Breaking Changes from Previous Implementation
 - Removed all fallbacks for cleaner code
 - Consolidated all constants in a single file
 - Streamlined API endpoints usage
 - Clear separation between core functions and API interaction
+- Standardized Promise-based approach for async operations
+- Reduced API surface to improve maintainability

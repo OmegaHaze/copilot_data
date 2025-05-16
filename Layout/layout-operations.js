@@ -1,259 +1,112 @@
-/**
- * layout-operations.js
- * High-level operations for manipulating layouts (add, remove, resize items)
- */
+// layout-operations.js
+// High-level operations for manipulating layout items across breakpoints
 
-import { BREAKPOINTS } from './layout-constants';
-import { validateLayoutItem, createEmptyLayout } from './layout-core';
-import { getModuleDefaultSize, getOptimalPosition } from './layout-positioning';
+import { BREAKPOINTS, MODULE_CONSTRAINTS, DEFAULT_MODULE_SIZES } from './layout-constants';
+import { createEmptyLayout } from './layout-core';
+import { getOptimalPosition } from './layout-positioning';
 
 /**
- * Finds a layout item by ID in a specific breakpoint
- * @param {Object} layouts - Current layouts
- * @param {string} itemId - ID of item to find
- * @param {string} breakpoint - Breakpoint to search in (optional)
- * @returns {Object|null} Found layout item or null
- */
-export function findLayoutItem(layouts, itemId, breakpoint) {
-  if (!layouts || !itemId) {
-    return null;
-  }
-  
-  // If breakpoint specified, only search in that breakpoint
-  if (breakpoint && layouts[breakpoint]) {
-    return layouts[breakpoint].find(item => item.i === itemId) || null;
-  }
-  
-  // Otherwise search in all breakpoints and return first match
-  for (const bp of BREAKPOINTS) {
-    if (layouts[bp]) {
-      const found = layouts[bp].find(item => item.i === itemId);
-      if (found) {
-        return found;
-      }
-    }
-  }
-  
-  return null;
-}
-
-/**
- * Adds a layout item to all breakpoints with optimal positioning
- * @param {Object} layouts - Current layouts
- * @param {Object} item - Item to add (must have i property at minimum)
- * @returns {Object} Updated layouts
- */
-export function addItemToAllBreakpoints(layouts, item) {
-  if (!layouts || !item || !item.i) {
-    return layouts;
-  }
-  
-  // Get size props from item or use defaults
-  const size = {
-    w: item.w || 12,
-    h: item.h || 8
-  };
-  
-  // Create new layouts object to avoid mutating the input
-  const newLayouts = { ...layouts };
-  
-  // Add to each breakpoint with appropriate positioning
-  BREAKPOINTS.forEach(bp => {
-    // Ensure breakpoint exists
-    if (!Array.isArray(newLayouts[bp])) {
-      newLayouts[bp] = [];
-    }
-    
-    // Skip if item already exists in this breakpoint
-    if (newLayouts[bp].some(existingItem => existingItem.i === item.i)) {
-      return;
-    }
-    
-    // Find optimal position
-    const position = getOptimalPosition(bp, newLayouts[bp], size);
-    
-    // Create new item for this breakpoint
-    const newItem = {
-      i: item.i,
-      x: position.x,
-      y: position.y,
-      w: size.w,
-      h: size.h,
-      // Pass through other properties from the original item
-      ...item
-    };
-    
-    // Add to this breakpoint
-    newLayouts[bp].push(newItem);
-  });
-  
-  return newLayouts;
-}
-
-/**
- * Removes an item from all breakpoints
- * @param {Object} layouts - Current layouts
- * @param {string} itemId - ID of item to remove
- * @returns {Object} Updated layouts
- */
-export function removeItemFromAllBreakpoints(layouts, itemId) {
-  if (!layouts || !itemId) {
-    return layouts;
-  }
-  
-  // Create new layouts object to avoid mutating the input
-  const newLayouts = { ...layouts };
-  
-  // Remove from each breakpoint
-  BREAKPOINTS.forEach(bp => {
-    if (Array.isArray(newLayouts[bp])) {
-      newLayouts[bp] = newLayouts[bp].filter(item => item.i !== itemId);
-    }
-  });
-  
-  return newLayouts;
-}
-
-/**
- * Updates an existing item in all breakpoints
- * @param {Object} layouts - Current layouts
- * @param {Object} updatedItem - Item with updated properties
- * @returns {Object} Updated layouts
+ * Updates a layout item by ID across all breakpoints
  */
 export function updateItemInAllBreakpoints(layouts, updatedItem) {
-  if (!layouts || !updatedItem || !updatedItem.i) {
-    return layouts;
-  }
-  
-  // Create new layouts object to avoid mutating the input
-  const newLayouts = { ...layouts };
-  
-  // Update in each breakpoint
-  BREAKPOINTS.forEach(bp => {
-    if (Array.isArray(newLayouts[bp])) {
-      newLayouts[bp] = newLayouts[bp].map(item => {
-        if (item.i === updatedItem.i) {
-          return { ...item, ...updatedItem };
-        }
-        return item;
-      });
-    }
-  });
-  
-  return newLayouts;
+  if (!layouts || !updatedItem?.i) return layouts;
+
+  return BREAKPOINTS.reduce((acc, bp) => {
+    const items = Array.isArray(layouts[bp]) ? layouts[bp] : [];
+    acc[bp] = items.map(item =>
+      item.i === updatedItem.i ? { ...item, ...updatedItem } : item
+    );
+    return acc;
+  }, { ...layouts });
 }
 
 /**
- * Updates the size of an item in all breakpoints
- * @param {Object} layouts - Current layouts
- * @param {string} itemId - ID of item to resize
- * @param {Object} newSize - New size {w, h}
- * @returns {Object} Updated layouts
+ * Applies a new width and height to an item across breakpoints
  */
-export function resizeItemInAllBreakpoints(layouts, itemId, newSize) {
-  if (!layouts || !itemId || !newSize) {
+export function resizeItemInAllBreakpoints(layouts, paneId, newSize) {
+  if (!layouts || !paneId || typeof newSize?.w !== 'number' || typeof newSize?.h !== 'number') {
     return layouts;
   }
-  
-  const { w, h } = newSize;
-  
-  if (typeof w !== 'number' || typeof h !== 'number') {
-    return layouts;
-  }
-  
-  // Create new layouts object to avoid mutating the input
-  const newLayouts = { ...layouts };
-  
-  // Resize in each breakpoint
-  BREAKPOINTS.forEach(bp => {
-    if (Array.isArray(newLayouts[bp])) {
-      newLayouts[bp] = newLayouts[bp].map(item => {
-        if (item.i === itemId) {
-          return { ...item, w, h };
-        }
-        return item;
-      });
-    }
-  });
-  
-  return newLayouts;
+
+  return updateItemInAllBreakpoints(layouts, { i: paneId, w: newSize.w, h: newSize.h });
 }
 
 /**
- * Creates a complete layout item for a module to be placed in all breakpoints
- * @param {string} moduleId - Module ID
- * @param {Object} currentLayouts - Current layouts structure
- * @param {Object} size - Size for the item {w, h}
- * @returns {Object} Updated layouts with the new item
+ * Inserts a layout item with optional size across all breakpoints
  */
-export function createItemForAllBreakpoints(moduleId, currentLayouts = {}, size = { w: 12, h: 8 }) {
-  if (!moduleId) {
-    return currentLayouts;
-  }
-  
-  // Ensure we have valid layouts to work with
-  const layouts = currentLayouts && typeof currentLayouts === 'object' ? 
-    currentLayouts : createEmptyLayout();
-  
-  // Create base item
+export function createItemForAllBreakpoints(paneId, currentLayouts = {}, size = null) {
+  if (!paneId) return currentLayouts;
+
+  // Import DEFAULT_MODULE_SIZES to ensure proper sizing
   const baseItem = {
-    i: moduleId,
-    w: size.w,
-    h: size.h,
-    // Default props for react-grid-layout
-    minW: 2,
-    minH: 2
+    i: paneId,
+    minW: MODULE_CONSTRAINTS.MIN_W,
+    minH: MODULE_CONSTRAINTS.MIN_H,
+    // Ensure we always have a default width and height
+    w: (size && typeof size.w === 'number') ? size.w : DEFAULT_MODULE_SIZES.lg.w,
+    h: (size && typeof size.h === 'number') ? size.h : DEFAULT_MODULE_SIZES.lg.h
   };
-  
-  return addItemToAllBreakpoints(layouts, baseItem);
+
+  return addItemToAllBreakpoints(currentLayouts, baseItem);
 }
 
 /**
- * Reorders all items in a layout by y-position (top to bottom)
- * @param {Object} layouts - Current layouts
- * @returns {Object} Updated layouts with items reordered
+ * Inserts a layout item across all breakpoints with optimal positioning
+ */
+export function addItemToAllBreakpoints(layouts, item) {
+  if (!layouts || !item?.i) return layouts;
+
+  return BREAKPOINTS.reduce((acc, bp) => {
+    const bpLayout = Array.isArray(acc[bp]) ? [...acc[bp]] : [];
+
+    // Skip if item already exists
+    if (bpLayout.some(existing => existing.i === item.i)) {
+      acc[bp] = bpLayout;
+      return acc;
+    }
+
+    // Use defaults from DEFAULT_MODULE_SIZES if item dimensions are missing
+    const itemSize = {
+      w: typeof item.w === 'number' ? item.w : DEFAULT_MODULE_SIZES[bp]?.w || DEFAULT_MODULE_SIZES.lg.w,
+      h: typeof item.h === 'number' ? item.h : DEFAULT_MODULE_SIZES[bp]?.h || DEFAULT_MODULE_SIZES.lg.h
+    };
+    
+    const pos = getOptimalPosition(bp, bpLayout, itemSize);
+    const newItem = {
+      ...item,
+      x: pos.x,
+      y: pos.y,
+      w: itemSize.w,
+      h: itemSize.h
+    };
+
+    acc[bp] = [...bpLayout, newItem];
+    return acc;
+  }, { ...layouts });
+}
+
+/**
+ * Removes a layout item across all breakpoints
+ */
+export function removeItemFromAllBreakpoints(layouts, paneId) {
+  if (!layouts || !paneId) return layouts;
+
+  return BREAKPOINTS.reduce((acc, bp) => {
+    const items = Array.isArray(layouts[bp]) ? layouts[bp] : [];
+    acc[bp] = items.filter(item => item.i !== paneId);
+    return acc;
+  }, { ...layouts });
+}
+
+/**
+ * Sorts layout items in each breakpoint top-to-bottom, left-to-right
  */
 export function reorderLayoutsByPosition(layouts) {
-  if (!layouts) {
-    return createEmptyLayout();
-  }
-  
-  const newLayouts = { ...layouts };
-  
-  BREAKPOINTS.forEach(bp => {
-    if (Array.isArray(newLayouts[bp])) {
-      // Sort items by y then x position
-      newLayouts[bp].sort((a, b) => {
-        if (a.y === b.y) {
-          return a.x - b.x;
-        }
-        return a.y - b.y;
-      });
-    }
-  });
-  
-  return newLayouts;
-}
+  if (!layouts) return createEmptyLayout();
 
-/**
- * Compacts a layout to remove empty spaces
- * Note: This is a simplified version. For production use,
- * consider using react-grid-layout's built-in compaction.
- * 
- * @param {Object} layouts - Current layouts
- * @param {string} breakpoint - Specific breakpoint to compact
- * @returns {Object} Compacted layouts
- */
-export function compactLayout(layouts, breakpoint) {
-  // Simple implementation - for a full implementation,
-  // this would recreate the positioning algorithm from react-grid-layout
-  // which is complex and outside the scope here
-  
-  if (!layouts || !breakpoint || !Array.isArray(layouts[breakpoint])) {
-    return layouts;
-  }
-  
-  // For now, just return the layouts as-is with a note
-  console.warn('Layout compaction is delegated to react-grid-layout');
-  return layouts;
+  return BREAKPOINTS.reduce((acc, bp) => {
+    const items = Array.isArray(layouts[bp]) ? [...layouts[bp]] : [];
+    acc[bp] = items.sort((a, b) => (a.y === b.y ? a.x - b.x : a.y - b.y));
+    return acc;
+  }, { ...layouts });
 }

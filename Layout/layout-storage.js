@@ -1,115 +1,126 @@
-/**
- * storage.js
- * Pure functions for layout persistence to localStorage and sessionStorage
- */
+// layout-storage.js
+// Pure functions for layout persistence to localStorage only
 
 import { STORAGE_KEYS } from './layout-constants';
-import { validateLayout, transformLayout } from './layout-core';
+import { validateLayout, transformLayout } from './layout-shared';
 
 /**
- * Saves layouts to localStorage only
- * @param {Object} layouts - Layouts to save
- * @returns {boolean} Success status
+ * Save validated layout structure to localStorage
  */
 export function saveToLocalStorage(layouts) {
   if (!validateLayout(layouts)) {
-    console.error('Invalid layouts structure provided to saveToLocalStorage');
+    console.error('[layout-storage] Invalid layout passed to saveToLocalStorage');
     return false;
   }
-  
+
   try {
-    // Prepare layout for storage (strip unnecessary props, validate structure)
-    const transformedLayouts = transformLayout(layouts);
-    localStorage.setItem(STORAGE_KEYS.LAYOUTS, JSON.stringify(transformedLayouts));
+    localStorage.setItem(
+      STORAGE_KEYS.LAYOUTS,
+      JSON.stringify(transformLayout(layouts))
+    );
     return true;
-  } catch (error) {
-    console.error('Failed to save layouts to localStorage:', error);
+  } catch (err) {
+    console.error('[layout-storage] Failed to write layout:', err);
     return false;
   }
 }
 
 /**
- * Saves active modules to localStorage
- * @param {Array} modules - Active module IDs
- * @returns {boolean} Success status
+ * Save array of active module IDs to localStorage
  */
 export function saveActiveModulesToLocalStorage(modules) {
   if (!Array.isArray(modules)) {
-    console.error('Invalid modules array provided to saveActiveModulesToLocalStorage');
+    console.error('[layout-storage] Invalid module list');
     return false;
   }
-  
+
   try {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_MODULES, JSON.stringify(modules));
     return true;
-  } catch (error) {
-    console.error('Failed to save active modules to localStorage:', error);
+  } catch (err) {
+    console.error('[layout-storage] Failed to write active modules:', err);
     return false;
   }
 }
 
 /**
- * Loads layouts from localStorage
- * @returns {Object|null} Loaded layouts or null if not found/invalid
+ * Load layout structure from localStorage
  */
 export function loadLayoutsFromLocalStorage() {
   try {
-    const storedData = localStorage.getItem(STORAGE_KEYS.LAYOUTS);
-    if (!storedData) {
-      return null;
-    }
-    
-    const parsedLayouts = JSON.parse(storedData);
-    
-    // Validate the loaded layouts
-    if (!validateLayout(parsedLayouts)) {
-      console.warn('Invalid layouts found in localStorage');
-      return null;
-    }
-    
-    return parsedLayouts;
-  } catch (error) {
-    console.error('Failed to load layouts from localStorage:', error);
+    const raw = localStorage.getItem(STORAGE_KEYS.LAYOUTS);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    return validateLayout(parsed) ? parsed : null;
+  } catch (err) {
+    console.error('[layout-storage] Failed to read layout:', err);
     return null;
   }
 }
 
 /**
- * Loads active modules from localStorage
- * @returns {Array|null} Active modules or null if not found/invalid
+ * Load active module ID array from localStorage
  */
 export function loadActiveModulesFromLocalStorage() {
   try {
-    const storedModules = localStorage.getItem(STORAGE_KEYS.ACTIVE_MODULES);
-    if (!storedModules) {
-      return null;
-    }
-    
-    const parsedModules = JSON.parse(storedModules);
-    
-    // Validate the loaded modules
-    if (!Array.isArray(parsedModules)) {
-      console.warn('Invalid active modules found in localStorage');
-      return null;
-    }
-    
-    return parsedModules;
-  } catch (error) {
-    console.error('Failed to load active modules from localStorage:', error);
+    const raw = localStorage.getItem(STORAGE_KEYS.ACTIVE_MODULES);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch (err) {
+    console.error('[layout-storage] Failed to read active modules:', err);
     return null;
   }
 }
 
 /**
- * Clears all layout data from localStorage
+ * Clear layout and module keys from localStorage
  */
 export function clearLayoutsFromLocalStorage() {
   try {
     localStorage.removeItem(STORAGE_KEYS.LAYOUTS);
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_MODULES);
     return true;
-  } catch (error) {
-    console.error('Failed to clear layout data from localStorage:', error);
+  } catch (err) {
+    console.error('[layout-storage] Failed to clear localStorage keys:', err);
     return false;
   }
+}
+
+/**
+ * Convenience wrapper: save both layout and modules
+ * Also updates sessionStorage for immediate access
+ */
+export function saveLayoutsToSession(layouts, activeModules = []) {
+  // Save to localStorage
+  const layoutOK = saveToLocalStorage(layouts);
+  const modulesOK = saveActiveModulesToLocalStorage(activeModules);
+  
+  // Also update sessionStorage for immediate access
+  (async () => {
+    try {
+      // We need to import these dynamically to avoid circular dependencies
+      const { saveToSessionStorage } = await import('../Session/session-storage');
+      const { STORAGE_KEYS } = await import('../Session/session-constants');
+      
+      // Update individual values
+      saveToSessionStorage(STORAGE_KEYS.LAYOUTS, layouts);
+      saveToSessionStorage(STORAGE_KEYS.ACTIVE_MODULES, activeModules);
+      
+      // Also update combined session object
+      const sessionData = {
+        gridLayout: layouts,
+        activeModules: activeModules
+      };
+      
+      saveToSessionStorage(STORAGE_KEYS.SESSION_DATA, sessionData);
+      
+    } catch (err) {
+      console.warn('[layout-storage] Failed to update sessionStorage:', err);
+    }
+  })();
+  
+  return layoutOK && modulesOK;
 }

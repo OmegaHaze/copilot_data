@@ -1,40 +1,19 @@
-/**
- * positioning.js
- * Smart placement algorithms for layout items
- */
+// layout-positioning.js
+// Smart placement algorithms for layout items
 
-import { COLS, MODULE_SIZE_MAP, DEFAULT_MODULE_SIZE } from './layout-constants';
-import { createLayoutItem } from './layout-core';
+import { COLS, DEFAULT_MODULE_SIZES, BREAKPOINTS } from './layout-constants';
 
 /**
- * Gets the default size for a module type
- * @param {string} moduleType - Type of module (SYSTEM, SERVICE, USER, etc.)
- * @returns {Object} Width and height configuration {w, h}
- */
-export function getModuleDefaultSize(moduleType) {
-  if (!moduleType) {
-    return DEFAULT_MODULE_SIZE;
-  }
-  
-  // Ensure moduleType is uppercase to match our MODULE_SIZE_MAP keys
-  const type = moduleType.toUpperCase();
-  return MODULE_SIZE_MAP[type] || MODULE_SIZE_MAP.default;
-}
-
-/**
- * Checks if a position would cause a collision in the grid
- * @param {Array} layout - Current layout items
- * @param {Object} itemToCheck - Item to check for collisions (x, y, w, h)
- * @returns {boolean} True if collision would occur
+ * Checks if a proposed item would collide with existing items
+ * @param {Array} layout - Array of layout items for a specific breakpoint
+ * @param {Object} itemToCheck - Item with x, y, w, h properties to check for collision
+ * @returns {boolean} True if collision exists, false otherwise
  */
 export function collisionExists(layout, itemToCheck) {
-  if (!layout || !Array.isArray(layout)) return false;
-  
+  if (!Array.isArray(layout)) return false;
+
   return layout.some(item => {
-    // Check if item is different
     if (item.i === itemToCheck.i) return false;
-    
-    // Check for overlap
     return !(
       itemToCheck.x + itemToCheck.w <= item.x ||
       itemToCheck.x >= item.x + item.w ||
@@ -45,153 +24,77 @@ export function collisionExists(layout, itemToCheck) {
 }
 
 /**
- * Find first available position for a new item
- * @param {Array} layout - Current layout items
- * @param {number} cols - Number of columns in grid
- * @param {Object} itemSize - Width and height of new item {w, h}
- * @returns {Object} Coordinates {x, y} for optimal position
+ * Finds the first open space in the layout for a new item
+ * @param {Array} layout - Layout items at a specific breakpoint
+ * @param {number} cols - Number of columns at that breakpoint
+ * @param {Object} itemSize - Expected shape: { w, h }
+ * @returns {Object} Position: { x, y }
  */
 export function findFirstAvailablePosition(layout, cols, itemSize) {
-  // Use provided size or default
-  const size = {
-    w: itemSize?.w || DEFAULT_MODULE_SIZE.w,
-    h: itemSize?.h || DEFAULT_MODULE_SIZE.h
+  const { w, h } = {
+    w: itemSize?.w ?? DEFAULT_MODULE_SIZES.lg.w,
+    h: itemSize?.h ?? DEFAULT_MODULE_SIZES.lg.h
   };
-  
-  // Maximum column constraint
-  const maxCol = Math.max(1, cols - size.w + 1);
-  
-  // Start with position 0,0
+
+  const maxCol = Math.max(1, cols - w + 1);
   let y = 0;
-  let allPositionsChecked = false;
-  
-  // Keep searching until we find a position or check everything
-  while (!allPositionsChecked) {
+
+  while (y <= 1000) {
     for (let x = 0; x < maxCol; x++) {
-      // Create a test item
-      const testItem = { x, y, w: size.w, h: size.h };
-      
-      // Check if this position works
-      if (!collisionExists(layout, testItem)) {
+      if (!collisionExists(layout, { x, y, w, h })) {
         return { x, y };
       }
     }
-    
-    // Move to next row
     y++;
-    
-    // Simple safety check to avoid infinite loop
-    // A reasonable max rows is 1000
-    if (y > 1000) {
-      allPositionsChecked = true;
-    }
   }
-  
-  // If we've checked all positions, return a position at the bottom
+
   return { x: 0, y: getBottomRow(layout) };
 }
 
 /**
- * Get the bottom row of the current layout
- * @param {Array} layout - Current layout items
- * @returns {number} Y-coordinate after the last item
+ * Calculates the bottom-most row in the current layout
  */
 export function getBottomRow(layout) {
-  if (!layout || !Array.isArray(layout) || layout.length === 0) {
-    return 0;
-  }
-  
-  // Find the maximum y + h value
+  if (!Array.isArray(layout) || layout.length === 0) return 0;
   return Math.max(...layout.map(item => item.y + item.h));
 }
 
 /**
- * Get optimal position for a new pane in a specific breakpoint
- * @param {string} breakpoint - The breakpoint name (lg, md, sm, xs, xxs)
- * @param {Array} existingItems - The existing layout items for this breakpoint
- * @param {Object} newItemSize - Width and height for the new item
- * @returns {Object} - { x, y } coordinates for optimal placement
+ * Finds the best open space for a new item in a breakpoint-aware grid
+ * @param {string} breakpoint - Breakpoint name
+ * @param {Array} existingItems - Current layout items
+ * @param {Object} newItemSize - { w, h } of the item to place
  */
 export function getOptimalPosition(breakpoint, existingItems = [], newItemSize) {
-  // Validate breakpoint
-  if (!breakpoint || !COLS[breakpoint]) {
-    breakpoint = 'lg';
-  }
-  
-  // Get column count for this breakpoint
-  const colCount = COLS[breakpoint];
-  
-  // If no existing items, start at the origin
-  if (!existingItems || !Array.isArray(existingItems) || existingItems.length === 0) {
+  const colCount = COLS[breakpoint] ?? COLS.lg;
+  if (!Array.isArray(existingItems) || existingItems.length === 0) {
     return { x: 0, y: 0 };
   }
-  
-  // Find the best position
+
   return findFirstAvailablePosition(existingItems, colCount, newItemSize);
 }
 
 /**
- * Creates layout items for all breakpoints
- * @param {string} itemId - ID of the new item
- * @param {Object} currentLayouts - Current grid layouts for all breakpoints
- * @param {Object} size - Optional size (w, h) for the item
- * @returns {Object} - New layouts with the item added to all breakpoints
- */
-export function createItemForAllBreakpoints(itemId, currentLayouts, size) {
-  // Ensure valid layouts object
-  const layouts = { ...currentLayouts };
-  COLS.forEach(bp => {
-    if (!layouts[bp]) layouts[bp] = [];
-  });
-  
-  // Create item for each breakpoint
-  const result = { ...layouts };
-  COLS.forEach(bp => {
-    const position = getOptimalPosition(bp, layouts[bp], size);
-    
-    // Create the layout item
-    const newItem = createLayoutItem(
-      itemId,
-      position.x,
-      position.y,
-      size?.w || DEFAULT_MODULE_SIZE.w,
-      size?.h || DEFAULT_MODULE_SIZE.h
-    );
-    
-    // Add to layout
-    result[bp] = [...(result[bp] || []), newItem];
-  });
-  
-  return result;
-}
-
-/**
- * Updates a layout item's size across all breakpoints
- * @param {Object} layouts - Current layouts
- * @param {string} itemId - ID of item to update
- * @param {Object} newSize - New size {w, h}
+ * Updates an item's size across all breakpoints
+ * @param {Object} layouts - Full layout map
+ * @param {string} paneId - Target item ID
+ * @param {Object} newSize - { w, h }
  * @returns {Object} Updated layouts
  */
-export function updateItemSize(layouts, itemId, newSize) {
-  if (!layouts || !itemId || !newSize) return layouts;
-  
-  const result = { ...layouts };
-  
-  // Update size in each breakpoint
-  COLS.forEach(bp => {
-    if (!Array.isArray(result[bp])) return;
-    
-    result[bp] = result[bp].map(item => {
-      if (item.i === itemId) {
-        return { 
-          ...item, 
-          w: newSize.w !== undefined ? newSize.w : item.w,
-          h: newSize.h !== undefined ? newSize.h : item.h 
-        };
-      }
-      return item;
-    });
-  });
-  
-  return result;
+export function updateItemSize(layouts, paneId, newSize) {
+  if (!layouts || !paneId || typeof newSize !== 'object') return layouts;
+
+  return BREAKPOINTS.reduce((acc, bp) => {
+    const items = Array.isArray(layouts[bp]) ? layouts[bp] : [];
+    acc[bp] = items.map(item =>
+      item.i === paneId
+        ? {
+            ...item,
+            w: newSize.w ?? item.w,
+            h: newSize.h ?? item.h
+          }
+        : item
+    );
+    return acc;
+  }, { ...layouts });
 }

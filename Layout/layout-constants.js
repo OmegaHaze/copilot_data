@@ -1,70 +1,95 @@
-/**
- * constants.js
- * Central source of truth for all layout-related constants
- */
+// layout-constants.js
+// Centralized configuration for responsive grid layout system (balanced precision mode)
 
-// Standard responsive breakpoints
+// -------------------------------------------------------------
+// Breakpoint Definitions – used in all layout calculations
 export const BREAKPOINTS = ['lg', 'md', 'sm', 'xs', 'xxs'];
 
-// Column configuration for each breakpoint
-export const COLS = {
-  lg: 12,
-  md: 10,
-  sm: 6,
-  xs: 4,
-  xxs: 2
+export const BREAKPOINT_VALUES = {
+  lg: 1600, // Ultra-wide monitors, large desktops
+  md: 1200, // Standard desktops
+  sm: 992,  // Tablets and small laptops
+  xs: 768,  // Large phones / portrait tablets
+  xxs: 480  // Mobile phones
 };
 
-// Storage keys for localStorage and sessionStorage
+// -------------------------------------------------------------
+// Grid Column Precision – reduced for better UX
+export const COLS = {
+  lg: 24,
+  md: 20,
+  sm: 16,
+  xs: 12,
+  xxs: 8
+};
+// -------------------------------------------------------------
+// Static row heights per breakpoint (in pixels)
+export const ROW_HEIGHTS = {
+  lg: 30,
+  md: 28,
+  sm: 26,
+  xs: 24,
+  xxs: 22
+};
+
+// -------------------------------------------------------------
+// Margins between items (in pixels) [horizontal, vertical]
+export const MARGIN = {
+  lg: [8, 8],
+  md: [8, 8],
+  sm: [6, 6],
+  xs: [4, 4],
+  xxs: [2, 2]
+};
+
+// -------------------------------------------------------------
+// Padding around the entire grid container
+export const CONTAINER_PADDING = {
+  lg: [10, 10],
+  md: [8, 8],
+  sm: [6, 6],
+  xs: [4, 4],
+  xxs: [2, 2]
+};
+
+// -------------------------------------------------------------
+// Default module sizes per breakpoint (grid units)
+export const DEFAULT_MODULE_SIZES = {
+  lg: { w: 12, h: 8 },   // Reduced by half and swapped h/w
+  md: { w: 12, h: 6 },
+  sm: { w: 10, h: 6 },
+  xs: { w: 8, h: 4 },
+  xxs: { w: 6, h: 4 }
+};
+
+
+
+// -------------------------------------------------------------
+// Local/session storage keys (flat string constants)
 export const STORAGE_KEYS = {
   LAYOUTS: 'vaio_layouts',
   ACTIVE_MODULES: 'vaio_active_modules'
 };
 
-// API endpoints for session and layout operations
+// -------------------------------------------------------------
+// Backend API endpoints for layout/session persistence
 export const API_ENDPOINTS = {
   SESSION_DATA: '/api/user/session',
   SESSION_GRID: '/api/user/session/grid',
   SESSION_MODULES: '/api/user/session/modules',
-  LAYOUTS: '/api/user/layouts'
+  LAYOUTS: '/api/user/layouts',
+  TEMPLATES: '/api/layout/templates'
 };
 
-// Default module dimensions
-export const DEFAULT_MODULE_SIZE = {
-  w: 12,
-  h: 8
+// -------------------------------------------------------------
+// Min dimension enforcement (used during resizing/insertion)
+export const MODULE_CONSTRAINTS = {
+  MIN_W: 6,
+  MIN_H: 4
 };
 
-// Default grid item properties
-export const DEFAULT_MIN_SIZE = { 
-  w: 3, 
-  h: 3 
-};
-
-// Module type to size mapping
-export const MODULE_SIZE_MAP = {
-  'SYSTEM': { w: 12, h: 8 },
-  'SERVICE': { w: 12, h: 8 },
-  'CPU': { w: 12, h: 6 },
-  'MEMORY': { w: 12, h: 6 },
-  'DISK': { w: 12, h: 8 },
-  'NETWORK': { w: 12, h: 8 },
-  'USER': { w: 12, h: 8 },
-  'default': { w: 12, h: 8 }
-};
-
-// Default row height for grid
-export const DEFAULT_ROW_HEIGHT = 60;
-
-// Module type style classes for UI differentiation
-export const MODULE_TYPE_STYLE_CLASSES = {
-  SYSTEM: 'bg-blue-800/10',
-  SERVICE: 'bg-purple-800/10', 
-  USER: 'bg-yellow-800/10',
-  default: 'bg-gray-700/10'
-};
-
-// Validation constants
+// -------------------------------------------------------------
+// Hard rules for validation and normalization
 export const VALIDATION = {
   REQUIRED_ITEM_PROPS: ['i', 'x', 'y', 'w', 'h'],
   MODULE_TYPES: ['SYSTEM', 'SERVICE', 'USER']
