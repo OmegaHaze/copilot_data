@@ -1,8 +1,8 @@
 // layout-api.js
 // Functions for interacting with backend layout APIs
 
-import { API_ENDPOINTS } from './layout-constants';
-import { validateLayout, transformLayout } from './layout-shared';
+import { API_ENDPOINTS } from '../Session/session-constants.js';
+import { validateLayout } from './layout-shared.js';
 
 function handleFetchError(response, context) {
   if (!response.ok) {
@@ -36,11 +36,10 @@ export async function updateSessionGrid(layouts) {
     throw new Error('Invalid layouts structure provided to updateSessionGrid');
   }
 
-  const transformed = transformLayout(layouts);
   return await safeFetch(API_ENDPOINTS.SESSION_GRID, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(transformed),
+    body: JSON.stringify(layouts),
   }, 'Failed to update session grid');
 }
 

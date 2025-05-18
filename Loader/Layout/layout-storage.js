@@ -1,7 +1,7 @@
 // layout-storage.js
 // Pure functions for layout persistence to localStorage only
 
-import { STORAGE_KEYS } from './layout-constants';
+import { STORAGE_KEYS } from '../Session/session-constants.js';
 import { validateLayout, transformLayout } from './layout-shared';
 
 /**
