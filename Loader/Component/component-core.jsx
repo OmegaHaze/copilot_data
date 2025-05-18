@@ -34,11 +34,14 @@ export function getCanonicalKey(type) {
  * Generate the registration key used in the component registry
  * @param {string} moduleType - SYSTEM, SERVICE, USER
  * @param {string} staticIdentifier - Unique identifier (e.g. SupervisorPane)
- * @returns {string} Composite key like SYSTEM-SupervisorPane
+ * @param {string} instanceId - Optional instance identifier
+ * @returns {string} Composite key like SYSTEM-SupervisorPane or SYSTEM-SupervisorPane-instanceId
  */
-export function createRegistrationKey(moduleType, staticIdentifier) {
+export function createRegistrationKey(moduleType, staticIdentifier, instanceId = null) {
   const type = getCanonicalKey(moduleType);
-  return `${type}-${staticIdentifier}`;
+  return instanceId 
+    ? `${type}-${staticIdentifier}-${instanceId}`
+    : `${type}-${staticIdentifier}`;
 }
 
 /**
@@ -59,11 +62,17 @@ export function isValidPaneId(paneId) {
 export function parsePaneId(paneId) {
   if (!isValidPaneId(paneId)) return null;
 
-  const [moduleType, staticIdentifier, ...instanceParts] = paneId.split('-');
+  const parts = paneId.split('-');
+  const moduleType = parts[0];
+  const staticIdentifier = parts[1];
+  const instanceParts = parts.slice(2);
+  const instanceId = instanceParts.length > 0 ? instanceParts.join('-') : null;
+  
   return {
     moduleType,
     staticIdentifier,
-    instanceId: instanceParts.join('-')
+    instanceId,
+    fullId: paneId
   };
 }
 /**

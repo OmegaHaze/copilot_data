@@ -17,7 +17,11 @@ import { synchronizeLayoutAndModules } from '../Layout/layout-shared.js';
 export function findActiveInstances(moduleType, activeModules) {
   if (!Array.isArray(activeModules) || !moduleType) return [];
   const canonical = getCanonicalKey(moduleType);
-  return activeModules.filter(id => id.startsWith(`${canonical}-`));
+  
+  return activeModules.filter(id => {
+    const parts = id.split('-');
+    return parts.length >= 2 && getCanonicalKey(parts[0]) === canonical;
+  });
 }
 
 /**
@@ -76,6 +80,18 @@ export function removeModule(moduleType, activeModules, gridLayout) {
     gridLayout: layouts,
     removedInstances: instances
   };
+}
+
+// After removing instances
+if (instances.length > 0) {
+  // Notify registry about removed instances
+  instances.forEach(instanceId => {
+    try {
+      registry.unregisterComponent(instanceId);
+    } catch (err) {
+      console.warn(`Failed to unregister component ${instanceId}:`, err);
+    }
+  });
 }
 
 /**

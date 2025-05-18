@@ -25,7 +25,7 @@ export function parsePaneId(paneId) {
   return {
     moduleType: parts[0],
     staticIdentifier: parts[1],
-    instanceId: parts.length > 2 ? parts[2] : null,
+    instanceId: parts.length > 2 ? parts.slice(2).join('-') : null,
     fullId: paneId
   };
 }

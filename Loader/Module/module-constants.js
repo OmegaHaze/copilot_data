@@ -30,7 +30,10 @@ export const ERROR_MESSAGES = {
 };
 
 export const STORAGE_KEYS = {
-  MODULE_CACHE: 'vaio_module_cache'
+  MODULE_CACHE: 'vaio_module_cache',
+  ACTIVE_MODULES: 'vaio_active_modules',
+  LAYOUT_CACHE: 'vaio_layouts',
+  SESSION_DATA: 'vaio_session'
 };
 
 

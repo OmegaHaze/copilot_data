@@ -106,14 +106,9 @@ import { loadComponent } from './component-loader';
 
 // Export public API
 export {
-
   loadComponent,
   resolvePaneComponent,
   renderComponent,
-
   getActiveComponents,
-
-
-
   MODULE_TYPES
 };

@@ -153,16 +153,28 @@ export async function fetchAndSyncSessionData(setGridLayout, setActiveModules, s
     try {
       backendData = await syncSessionData();
     } catch (err) {
-      console.warn('[session-manager] Backend sync failed, falling back to localStorage');
+      console.warn('[session-manager] Backend sync failed, falling back to localStorage:', err);
       backendData = null;
     }
 
     if (backendData) {
-      if (setGridLayout) setGridLayout(backendData.gridLayout);
-      if (setActiveModules) setActiveModules(backendData.activeModules);
+      if (setGridLayout && backendData.gridLayout) setGridLayout(backendData.gridLayout);
+      if (setActiveModules && Array.isArray(backendData.activeModules)) setActiveModules(backendData.activeModules);
 
       saveToLocalStorage(STORAGE_KEYS.LAYOUTS, backendData.gridLayout);
       saveToLocalStorage(STORAGE_KEYS.ACTIVE_MODULES, backendData.activeModules);
+      
+      // Also notify registry about active modules
+      try {
+        const registry = await import('../Component/component-registry').then(m => m.default);
+        if (registry && Array.isArray(backendData.activeModules)) {
+          registry.notifyListeners('moduleStateChanged', { 
+            activeModules: backendData.activeModules 
+          });
+        }
+      } catch (err) {
+        console.warn('[session-manager] Failed to notify registry:', err);
+      }
     } else {
       const layout = loadFromLocalStorage(STORAGE_KEYS.LAYOUTS);
       const modules = loadFromLocalStorage(STORAGE_KEYS.ACTIVE_MODULES);

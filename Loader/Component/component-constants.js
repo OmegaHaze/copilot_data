@@ -18,7 +18,11 @@ export const API_ENDPOINTS = {
 
 // Storage keys
 export const STORAGE_KEYS = {
-  COMPONENT_CACHE: 'vaio_component_cache'
+  COMPONENT_CACHE: 'vaio_component_cache',
+  LAYOUT_CACHE: 'vaio_layouts',
+  MODULE_CACHE: 'vaio_module_cache',
+  ACTIVE_MODULES: 'vaio_active_modules',
+  SESSION_DATA: 'vaio_session'
 };
 
 // Timeouts in milliseconds
@@ -37,5 +41,6 @@ export const ERROR_MESSAGES = {
   MODULE_TYPE_REQUIRED: 'moduleType is required for component loading',
   COMPONENT_LOAD_FAILED: 'Failed to load component',
   NO_DEFAULT_EXPORT: 'No default export found for component',
-  NO_RESOLVER: 'No component resolver available'
+  NO_RESOLVER: 'No component resolver available',
+  NO_VALID_COMPONENT: 'Component is not a valid function'
 };

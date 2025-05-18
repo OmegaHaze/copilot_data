@@ -23,7 +23,7 @@ export async function resolvePaneComponent(paneId, moduleData = {}) {
   if (!parsed) return null;
 
   try {
-    const component = await loadComponent(parsed.moduleType, parsed.staticIdentifier);
+    const component = await loadComponent(parsed.moduleType, parsed.staticIdentifier, paneId);
 
     if (!component) {
       return null;
@@ -64,12 +64,12 @@ export function renderComponent(paneId, props = {}) {
     return createPlaceholder(paneId, 'Failed to parse pane ID');
   }
 
-  const registrationKey = `${parsed.moduleType}-${parsed.staticIdentifier}`;
+  const registrationKey = paneId;
   const raw = registry.getComponent(registrationKey);
 
   if (!raw) {
     // Start loading the component in the background
-    loadComponent(parsed.moduleType, parsed.staticIdentifier)
+    loadComponent(parsed.moduleType, parsed.staticIdentifier, paneId)
       .then(() => {
         if (props.onComponentLoaded && typeof props.onComponentLoaded === 'function') {
           props.onComponentLoaded();

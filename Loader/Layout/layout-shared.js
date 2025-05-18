@@ -112,12 +112,23 @@ export function synchronizeLayoutAndModules(layouts, activeModules) {
     syncedModules.push(id);
   });
 
-  // Filter down to valid layout items
-  const cleaned = transformLayout(layouts);
-  const cleanedIds = new Set();
-  Object.values(cleaned).forEach(bp => {
-    bp.forEach(item => cleanedIds.add(item.i));
+// Filter down to valid layout items and track which IDs are present
+const cleaned = transformLayout(layouts);
+const cleanedIds = new Set();
+const paneIdMap = new Map(); // Track paneId to module type and static id
+  
+Object.values(cleaned).forEach(bp => {
+  bp.forEach(item => {
+    cleanedIds.add(item.i);
+    
+    // Parse the paneId to extract moduleType and staticIdentifier
+    const parts = item.i.split('-');
+    if (parts.length >= 3) {
+      const [moduleType, staticIdentifier, ...instanceParts] = parts;
+      paneIdMap.set(item.i, { moduleType, staticIdentifier, instanceId: instanceParts.join('-') });
+    }
   });
+});
 
   const missing = activeModules.filter(id => !cleanedIds.has(id));
   const filled = generateDefaultLayouts(missing);

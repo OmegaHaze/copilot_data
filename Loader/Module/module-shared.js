@@ -16,16 +16,27 @@ export function getCanonicalKey(moduleKey) {
  * Create a pane ID from module type, static identifier, and instance ID
  */
 export function createPaneId(moduleType, staticIdentifier, instanceId) {
-  return moduleType && staticIdentifier && instanceId ? `${moduleType}-${staticIdentifier}-${instanceId}` : '';
+  if (!moduleType) return '';
+  if (!staticIdentifier) return '';
+  
+  const canonicalType = moduleType.toUpperCase();
+  return instanceId 
+    ? `${canonicalType}-${staticIdentifier}-${instanceId}` 
+    : `${canonicalType}-${staticIdentifier}`;
 }
 
 /**
  * Extract instance ID from a pane ID
  */
 export function getInstanceId(paneId) {
-  if (!paneId || !paneId.includes('-')) return null;
+  if (!paneId || typeof paneId !== 'string') return null;
+  
   const parts = paneId.split('-');
-  return parts.length > 1 ? parts[parts.length - 1] : null;
+  if (parts.length < 3) return null;
+  
+  // Return everything after moduleType-staticIdentifier
+  const [_, __, ...instanceParts] = parts;
+  return instanceParts.join('-');
 }
 
 /**

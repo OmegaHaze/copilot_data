@@ -21,20 +21,25 @@ export async function loadComponent(moduleType, staticIdentifier) {
     return null;
   }
 
-  const registrationKey = createRegistrationKey(moduleType, staticIdentifier);
+ const registrationKey = paneId || createRegistrationKey(moduleType, staticIdentifier);
 
-  // Return if already loaded
-  if (registry.hasComponent(registrationKey)) {
-    return registry.getComponent(registrationKey);
-  }
+
+// Return if already loaded - check both for paneId (instance) and component type
+if (paneId && registry.hasComponent(paneId)) {
+  return registry.getComponent(paneId);
+} else if (!paneId && registry.hasComponent(registrationKey)) {
+  return registry.getComponent(registrationKey);
+}
 
   // If already loading, return existing promise
-  if (componentLoadPromises.has(registrationKey)) {
-    return componentLoadPromises.get(registrationKey);
-  }
+const promiseKey = paneId || registrationKey;
+if (componentLoadPromises.has(promiseKey)) {
+  return componentLoadPromises.get(promiseKey);
+}
 
   // Create loading promise
-  const loadPromise = (async () => {
+const loadPromise = (async () => {
+  const componentKey = paneId || registrationKey;
     try {
       let componentModule = null;
 
@@ -81,17 +86,17 @@ export async function loadComponent(moduleType, staticIdentifier) {
         throw new Error(`${ERROR_MESSAGES.NO_VALID_COMPONENT}: ${staticIdentifier} -> ${typeof Component}`);
       }
 
-      registry.registerComponent(registrationKey, Component, moduleType);
+      registry.registerComponent(componentKey, Component, moduleType, paneId ? true : false);
       return Component;
     } catch (error) {
       registry.addError(registrationKey, error);
       throw error;
     } finally {
-      componentLoadPromises.delete(registrationKey);
+      componentLoadPromises.delete(promiseKey);
     }
   })();
 
-  componentLoadPromises.set(registrationKey, loadPromise);
+  componentLoadPromises.set(promiseKey, loadPromise);
   return loadPromise;
 }
 
