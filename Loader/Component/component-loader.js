@@ -16,12 +16,12 @@ const componentLoadPromises = new Map();
  * @param {string} staticIdentifier - Static identifier
  * @returns {Promise<Function|null>} - Component constructor
  */
-export async function loadComponent(moduleType, staticIdentifier) {
+export async function loadComponent(moduleType, staticIdentifier, paneId = null) {
   if (!moduleType || !staticIdentifier) {
     return null;
   }
 
- const registrationKey = paneId || createRegistrationKey(moduleType, staticIdentifier);
+  const registrationKey = paneId || createRegistrationKey(moduleType, staticIdentifier);
 
 
 // Return if already loaded - check both for paneId (instance) and component type

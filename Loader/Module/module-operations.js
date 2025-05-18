@@ -10,7 +10,7 @@ import {
 import { STORAGE_KEYS } from './module-constants';
 import { saveLayoutsToSession } from '../Layout/layout-storage.js';
 import { synchronizeLayoutAndModules } from '../Layout/layout-shared.js';
-
+import registry from '../Component/component-registry';
 /**
  * Find active instances of a module type
  */
@@ -75,23 +75,28 @@ export function removeModule(moduleType, activeModules, gridLayout) {
 
   const { layouts, modules } = synchronizeLayoutAndModules(updatedLayout, updatedModules);
 
+  // Notify registry about removed instances
+  if (instances.length > 0) {
+    // Import registry dynamically to prevent circular dependencies
+    try {
+      const registry = require('../Component/component-registry').default;
+      instances.forEach(instanceId => {
+        try {
+          registry.unregisterComponent(instanceId);
+        } catch (err) {
+          console.warn(`Failed to unregister component ${instanceId}:`, err);
+        }
+      });
+    } catch (err) {
+      console.warn('Failed to load component registry:', err);
+    }
+  }
+
   return {
     activeModules: modules,
     gridLayout: layouts,
     removedInstances: instances
   };
-}
-
-// After removing instances
-if (instances.length > 0) {
-  // Notify registry about removed instances
-  instances.forEach(instanceId => {
-    try {
-      registry.unregisterComponent(instanceId);
-    } catch (err) {
-      console.warn(`Failed to unregister component ${instanceId}:`, err);
-    }
-  });
 }
 
 /**

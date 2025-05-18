@@ -182,22 +182,29 @@ class ComponentRegistry {
    * @param {string} key - Component key
    * @param {Function} component - Component constructor
    * @param {string} moduleType - Module type
+   * @param {boolean} isInstance - Whether this is an instance registration
    * @returns {boolean} - Success status
    */
-  registerComponent(key, component, moduleType) {
-  if (!key || !component) return false;
+  registerComponent(key, component, moduleType, isInstance = false) {
+    if (!key || !component) return false;
 
-  this.components.set(key, component);
+    this.components.set(key, component);
 
-  if (this.moduleTypes[moduleType]) {
-    this.moduleTypes[moduleType].add(key);
+    if (this.moduleTypes[moduleType]) {
+      this.moduleTypes[moduleType].add(key);
+    }
+    
+    // Track if this is an instance registration
+    if (isInstance) {
+      component._isInstance = true;
+      component._instanceId = key;
+    }
+
+    this.notifyListeners('componentLoaded', { key, moduleType, isInstance });
+    this.notifyListeners('registryChanged', { type: 'componentAdded', key });
+
+    return true;
   }
-
-  this.notifyListeners('componentLoaded', { key, moduleType });
-  this.notifyListeners('registryChanged', { type: 'componentAdded', key });
-
-  return true;
-}
 
 
   /**
@@ -323,6 +330,29 @@ class ComponentRegistry {
    */
   getErrors() {
     return Object.fromEntries(this.errors);
+  }
+  
+  /**
+   * Unregister a component
+   * @param {string} key - Component key
+   * @returns {boolean} - Success status
+   */
+  unregisterComponent(key) {
+    if (!this.components.has(key)) return false;
+    
+    const component = this.components.get(key);
+    const moduleType = this.getCategoryForModule(key);
+    
+    this.components.delete(key);
+    
+    if (this.moduleTypes[moduleType]) {
+      this.moduleTypes[moduleType].delete(key);
+    }
+    
+    this.notifyListeners('componentUnloaded', { key, moduleType });
+    this.notifyListeners('registryChanged', { type: 'componentRemoved', key });
+    
+    return true;
   }
 }
 
