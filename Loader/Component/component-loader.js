@@ -45,10 +45,13 @@ const loadPromise = (async () => {
 
       // Try custom resolver if available
       if (typeof window.__VAIO_COMPONENT_RESOLVER__ === 'function') {
+        console.log(`[component-loader] Resolving ${staticIdentifier} using window resolver...`);
         const Component = await window.__VAIO_COMPONENT_RESOLVER__(staticIdentifier, moduleType);
         if (Component) {
           componentModule = Component;
+          console.log(`[component-loader] Successfully resolved ${staticIdentifier}`);
         } else {
+          console.warn(`[component-loader] Failed to resolve ${staticIdentifier} using resolver`);
           throw new Error(`${ERROR_MESSAGES.COMPONENT_LOAD_FAILED}: ${staticIdentifier}`);
         }
       } else {
@@ -72,13 +75,6 @@ const loadPromise = (async () => {
         componentModule = { default: componentModule };
       }
 
-      console.warn('[TRACE componentModule]', {
-        staticIdentifier,
-        moduleType,
-        returned: componentModule,
-        defaultExport: componentModule?.default,
-        defaultType: typeof componentModule?.default
-      });
 
       const Component = componentModule?.default;
 
@@ -86,7 +82,18 @@ const loadPromise = (async () => {
         throw new Error(`${ERROR_MESSAGES.NO_VALID_COMPONENT}: ${staticIdentifier} -> ${typeof Component}`);
       }
 
+      console.log(`[component-loader] Registering component ${componentKey} (from ${paneId ? 'paneId' : 'registration key'})`);
+      
+      // Add component meta information
+      Component.meta = {
+        moduleType,
+        staticIdentifier,
+        isInstance: !!paneId,
+        registeredAt: new Date().toISOString()
+      };
+      
       registry.registerComponent(componentKey, Component, moduleType, paneId ? true : false);
+      console.log(`[component-loader] Successfully registered ${componentKey}`);
       return Component;
     } catch (error) {
       registry.addError(registrationKey, error);

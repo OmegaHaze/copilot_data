@@ -164,10 +164,23 @@ export async function fetchAndSyncSessionData(setGridLayout, setActiveModules, s
       saveToLocalStorage(STORAGE_KEYS.LAYOUTS, backendData.gridLayout);
       saveToLocalStorage(STORAGE_KEYS.ACTIVE_MODULES, backendData.activeModules);
       
-      // Also notify registry about active modules
+      // Notify registry about active modules
       try {
+        // Set session data first - consolidated in one place
+        const sessionData = {
+          gridLayout: backendData.gridLayout,
+          activeModules: backendData.activeModules
+        };
+        saveToSessionStorage(STORAGE_KEYS.SESSION_DATA, sessionData);
+        
+        // Import registry dynamically to ensure we get the latest instance
         const registry = await import('../Component/component-registry').then(m => m.default);
         if (registry && Array.isArray(backendData.activeModules)) {
+          // First clear any existing event listeners to prevent duplicates
+          const existingListeners = registry.eventListeners?.moduleStateChanged || [];
+          console.info(`[session-manager] Registry has ${existingListeners.length} moduleStateChanged listeners`);
+          
+          // Notify listeners about module state change
           registry.notifyListeners('moduleStateChanged', { 
             activeModules: backendData.activeModules 
           });
@@ -181,7 +194,31 @@ export async function fetchAndSyncSessionData(setGridLayout, setActiveModules, s
 
       if (setGridLayout && layout) setGridLayout(layout);
       if (setActiveModules && modules) setActiveModules(modules);
-
+      
+      // Update component registry about modules
+      try {
+        // Set session data first - consolidated in one place
+        const sessionData = {
+          gridLayout: layout,
+          activeModules: modules
+        };
+        saveToSessionStorage(STORAGE_KEYS.SESSION_DATA, sessionData);
+        
+        // Import registry dynamically to ensure we get the latest instance
+        const registry = await import('../Component/component-registry').then(m => m.default);
+        if (registry && Array.isArray(modules)) {
+          // Log info about current registry state
+          const existingListeners = registry.eventListeners?.moduleStateChanged || [];
+          console.info(`[session-manager] Registry has ${existingListeners.length} moduleStateChanged listeners`);
+          
+          registry.notifyListeners('moduleStateChanged', { 
+            activeModules: modules 
+          });
+        }
+      } catch (err) {
+        console.warn('[session-manager] Failed to notify registry:', err);
+      }
+      
       await syncLocalStorageToBackend();
     }
 

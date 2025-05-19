@@ -81,13 +81,29 @@ class ComponentRegistry {
    * @param {Object} data - Module data
    */
   setModuleData(data) {
-    if (!data || typeof data !== 'object') return;
+    if (!data || typeof data !== 'object') {
+      console.warn('[component-registry] Invalid module data provided to setModuleData:', data);
+      return;
+    }
+    
+    console.log('[component-registry] Setting module data:', data);
     
     this.moduleData = {
-      [MODULE_TYPES.SYSTEM]: Array.isArray(data[MODULE_TYPES.SYSTEM]) ? data[MODULE_TYPES.SYSTEM] : [],
-      [MODULE_TYPES.SERVICE]: Array.isArray(data[MODULE_TYPES.SERVICE]) ? data[MODULE_TYPES.SERVICE] : [],
-      [MODULE_TYPES.USER]: Array.isArray(data[MODULE_TYPES.USER]) ? data[MODULE_TYPES.USER] : []
+      [MODULE_TYPES.SYSTEM]: Array.isArray(data[MODULE_TYPES.SYSTEM]) ? [...data[MODULE_TYPES.SYSTEM]] : [],
+      [MODULE_TYPES.SERVICE]: Array.isArray(data[MODULE_TYPES.SERVICE]) ? [...data[MODULE_TYPES.SERVICE]] : [],
+      [MODULE_TYPES.USER]: Array.isArray(data[MODULE_TYPES.USER]) ? [...data[MODULE_TYPES.USER]] : []
     };
+    
+    console.log('[component-registry] Module data after setting:', this.moduleData);
+    
+    // Dispatch custom event that the debug overlay can listen for
+    try {
+      window.dispatchEvent(new CustomEvent('vaio:module-data-updated', { 
+        detail: { moduleData: this.moduleData, timestamp: Date.now() } 
+      }));
+    } catch (e) {
+      console.warn('[component-registry] Failed to dispatch module-data-updated event:', e);
+    }
     
     this.notifyListeners('registryChanged', { type: 'moduleDataUpdated' });
     
@@ -182,29 +198,29 @@ class ComponentRegistry {
    * @param {string} key - Component key
    * @param {Function} component - Component constructor
    * @param {string} moduleType - Module type
-   * @param {boolean} isInstance - Whether this is an instance registration
    * @returns {boolean} - Success status
    */
-  registerComponent(key, component, moduleType, isInstance = false) {
-    if (!key || !component) return false;
+  registerComponent(key, component, moduleType) {
+  if (!key || !component) return false;
 
-    this.components.set(key, component);
-
-    if (this.moduleTypes[moduleType]) {
-      this.moduleTypes[moduleType].add(key);
-    }
-    
-    // Track if this is an instance registration
-    if (isInstance) {
-      component._isInstance = true;
-      component._instanceId = key;
-    }
-
-    this.notifyListeners('componentLoaded', { key, moduleType, isInstance });
-    this.notifyListeners('registryChanged', { type: 'componentAdded', key });
-
-    return true;
+  // Check if component already exists
+  const alreadyExists = this.components.has(key);
+  if (alreadyExists) {
+    console.warn(`[ComponentRegistry] Component ${key} is already registered. This may indicate a double-registration issue.`);
   }
+
+  this.components.set(key, component);
+
+  if (this.moduleTypes[moduleType]) {
+    this.moduleTypes[moduleType].add(key);
+  }
+
+  console.log(`[ComponentRegistry] ${alreadyExists ? 'Re-registered' : 'Registered'} component ${key} (${moduleType})`);
+  this.notifyListeners('componentLoaded', { key, moduleType });
+  this.notifyListeners('registryChanged', { type: 'componentAdded', key });
+
+  return true;
+}
 
 
   /**
@@ -303,6 +319,7 @@ class ComponentRegistry {
    * @returns {Object} - All module data
    */
   getModuleData() {
+    console.log('[component-registry] Getting module data:', this.moduleData);
     return this.moduleData;
   }
 
@@ -338,7 +355,10 @@ class ComponentRegistry {
    * @returns {boolean} - Success status
    */
   unregisterComponent(key) {
-    if (!this.components.has(key)) return false;
+    if (!this.components.has(key)) {
+      console.warn(`[ComponentRegistry] Attempted to unregister component ${key} but it doesn't exist`);
+      return false;
+    }
     
     const component = this.components.get(key);
     const moduleType = this.getCategoryForModule(key);
@@ -349,6 +369,7 @@ class ComponentRegistry {
       this.moduleTypes[moduleType].delete(key);
     }
     
+    console.log(`[ComponentRegistry] Unregistered component ${key} (${moduleType})`);
     this.notifyListeners('componentUnloaded', { key, moduleType });
     this.notifyListeners('registryChanged', { type: 'componentRemoved', key });
     

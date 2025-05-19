@@ -3,7 +3,7 @@
 
 import {
   validateLayout,
-  createEmptyLayout,
+  generateItemLayouts,
   synchronizeLayoutAndModules
 } from './layout-shared';
 
@@ -230,7 +230,7 @@ export {
   addModule,
   removeModule,
   createInitialLayouts,
-
+  generateItemLayouts, 
   clearLayoutsFromLocalStorage,
   loadActiveModulesFromLocalStorage,
   synchronizeLayoutAndModules,

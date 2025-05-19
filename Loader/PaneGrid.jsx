@@ -104,6 +104,7 @@ export default function PaneGrid({ layouts = {}, onLayoutChange, activeModules =
         containerPadding={containerPadding}
         isDraggable={!isDragDisabled}
         isResizable={!isDragDisabled}
+        draggableHandle=".pane-drag-handle"
         onLayoutChange={handleLayoutChange}
         onDragStop={handleDragResizeStop}
         onResizeStop={handleDragResizeStop}

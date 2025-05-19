@@ -30,7 +30,7 @@ export function validateLayout(layouts) {
  * - Removes invalid or falsey items from arrays
  */
 export function transformLayout(layouts) {
-  if (!layouts || typeof layouts !== 'object') return createEmptyLayout();
+  if (!layouts || typeof layouts !== 'object') return generateItemLayouts();
 
   const required = ['i', 'x', 'y', 'w', 'h'];
 
@@ -50,7 +50,7 @@ export function transformLayout(layouts) {
 /**
  * Create an empty layout for all breakpoints
  */
-export function createEmptyLayout() {
+export function generateItemLayouts() {
   return {
     lg: [], md: [], sm: [], xs: [], xxs: []
   };
@@ -85,7 +85,7 @@ function generateDefaultLayouts(moduleIds = []) {
 export function synchronizeLayoutAndModules(layouts, activeModules) {
   if (!validateLayout(layouts) || !Array.isArray(activeModules)) {
     return {
-      layouts: createEmptyLayout(),
+      layouts: generateItemLayouts(),
       modules: []
     };
   }
