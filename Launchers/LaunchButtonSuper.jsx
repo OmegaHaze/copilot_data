@@ -22,10 +22,8 @@ export default function LaunchButtonSuper({
     try {
       const fullKey = `${getCanonicalKey(moduleType)}-${staticIdentifier}`;
 
-      const { layouts: syncedLayout, modules: syncedModules } =
-        synchronizeLayoutAndModules(gridLayout, activeModules);
-
-      if (syncedModules.some(id => id.startsWith(`${getCanonicalKey(moduleType)}-${staticIdentifier}`))) {
+      // Check if module already exists in the ORIGINAL activeModules
+      if (activeModules.some(id => id.startsWith(`${getCanonicalKey(moduleType)}-${staticIdentifier}`))) {
         console.warn(`Instance of ${fullKey} already active. Skipping launch.`);
         setIsLaunching(false);
         return;
@@ -38,12 +36,13 @@ export default function LaunchButtonSuper({
         instanceId,
         activeModules: nextModules,
         gridLayout: nextLayout
-      } = await addModule(fullKey, syncedModules, syncedLayout);
+      } = await addModule(fullKey, activeModules, gridLayout);
 
       console.log(`Launching ${extractedType}-${extractedId}-${instanceId}`);
 
-      const { layouts: finalLayout, modules: finalModules } =
-        synchronizeLayoutAndModules(nextLayout, nextModules);
+      // Since we're updating state, no need to synchronize here - just use the result directly
+      setActiveModules(nextModules);
+      setGridLayout(nextLayout);
 
       try {
         const { loadComponent } = await import('../../../Panes/Utility/Loader/Component/component-loader');
@@ -97,11 +96,8 @@ export default function LaunchButtonSuper({
         console.warn(`Preloading component failed, Grid will retry: ${loadError.message}`);
       }
 
-      setActiveModules(finalModules);
-      setGridLayout(finalLayout);
-
       setTimeout(() => {
-        saveModuleState(finalLayout, finalModules);
+        saveModuleState(nextLayout, nextModules);
       }, 0);
 
       socket.emit('pane:launched', {

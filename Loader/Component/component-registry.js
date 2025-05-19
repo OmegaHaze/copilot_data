@@ -74,8 +74,6 @@ class ComponentRegistry {
     }
   }
 
-  // Component version method removed in base build
-
   /**
    * Set module data received from API
    * @param {Object} data - Module data
@@ -201,27 +199,46 @@ class ComponentRegistry {
    * @returns {boolean} - Success status
    */
   registerComponent(key, component, moduleType) {
-  if (!key || !component) return false;
+    if (!key || !component) return false;
 
-  // Check if component already exists
-  const alreadyExists = this.components.has(key);
-  if (alreadyExists) {
-    console.warn(`[ComponentRegistry] Component ${key} is already registered. This may indicate a double-registration issue.`);
+    // Check if this is a base component (MODULETYPE-STATICID format with no instance ID)
+    const parts = key.split('-');
+    const isBaseComponent = parts.length <= 2;
+    
+    if (isBaseComponent) {
+      console.log(`[ComponentRegistry] Skipping registration of base component ${key}`);
+      
+      // Track in moduleTypes but don't register
+      if (this.moduleTypes[moduleType]) {
+        this.moduleTypes[moduleType].add(key);
+      }
+      
+      // Important: Still add to component map for lookup, but don't notify or fully register
+      if (!this.components.has(key)) {
+        this.components.set(key, component);
+      }
+      
+      return false;
+    }
+
+    // For instance components, check if already exists
+    const alreadyExists = this.components.has(key);
+    if (alreadyExists) {
+      console.warn(`[ComponentRegistry] Component ${key} is already registered. This may indicate a double-registration issue.`);
+    }
+
+    this.components.set(key, component);
+
+    if (this.moduleTypes[moduleType]) {
+      this.moduleTypes[moduleType].add(key);
+    }
+
+    console.log(`[ComponentRegistry] ${alreadyExists ? 'Re-registered' : 'Registered'} component ${key} (${moduleType})`);
+    this.notifyListeners('componentLoaded', { key, moduleType });
+    this.notifyListeners('registryChanged', { type: 'componentAdded', key });
+
+    return true;
   }
-
-  this.components.set(key, component);
-
-  if (this.moduleTypes[moduleType]) {
-    this.moduleTypes[moduleType].add(key);
-  }
-
-  console.log(`[ComponentRegistry] ${alreadyExists ? 'Re-registered' : 'Registered'} component ${key} (${moduleType})`);
-  this.notifyListeners('componentLoaded', { key, moduleType });
-  this.notifyListeners('registryChanged', { type: 'componentAdded', key });
-
-  return true;
-}
-
 
   /**
    * Get a component by key
@@ -254,7 +271,11 @@ class ComponentRegistry {
    * @returns {Array} - Array of all registered component keys
    */
   getAllRegisteredKeys() {
-    return Array.from(this.components.keys());
+    // Filter out base components which aren't truly registered
+    return Array.from(this.components.keys()).filter(key => {
+      const parts = key.split('-');
+      return parts.length > 2; // Only return instance components
+    });
   }
 
   /**
@@ -360,11 +381,22 @@ class ComponentRegistry {
       return false;
     }
     
-    const component = this.components.get(key);
+    // Don't unregister base components
+    const parts = key.split('-');
+    const isBaseComponent = parts.length <= 2;
+    
+    if (isBaseComponent) {
+      console.log(`[ComponentRegistry] Skipping unregistration of base component ${key}`);
+      return false;
+    }
+    
+    // Get the module type before removing the component
     const moduleType = this.getCategoryForModule(key);
     
+    // Remove from components map
     this.components.delete(key);
     
+    // Remove from module type tracking
     if (this.moduleTypes[moduleType]) {
       this.moduleTypes[moduleType].delete(key);
     }

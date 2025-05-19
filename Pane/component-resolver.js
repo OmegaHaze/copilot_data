@@ -14,6 +14,9 @@ const paneModules = import.meta.glob('./*.jsx');
 // This map will be populated when components are requested
 const COMPONENT_MAP = {};
 
+// Store module data for sharing with the registry
+let moduleDataCache = null;
+
 /**
  * Component resolver function that will be attached to window
  * This allows the component loader to dynamically resolve components by their staticIdentifier
@@ -105,13 +108,14 @@ async function buildComponentMap() {
       const component = module.default;
 
       if (typeof component !== 'function') {
-        console.error(`[component-resolver] Invalid default export in ${componentName}`);
+        console.warn(`[component-resolver] No valid default export in ${componentName}`);
         return;
       }
 
       // Extract moduleType from component's default props or parameters
       let moduleType = MODULE_TYPES.SYSTEM; // Default
 
+      // Determine module type based on component name or defaultProps
       if (component.defaultProps && component.defaultProps.moduleType) {
         moduleType = component.defaultProps.moduleType;
       } else if (componentName === 'SupervisorPane') {
@@ -124,9 +128,24 @@ async function buildComponentMap() {
       const wrapped = { default: component };
       COMPONENT_MAP[componentName] = wrapped;
 
+      // Create proper module entry with the needed fields
+      const moduleEntry = {
+        module: `${moduleType}-${componentName}`,
+        staticIdentifier: componentName,
+        name: componentName,
+        // Add loadComponent function that component-loader.js uses
+        loadComponent: async () => {
+          return wrapped;
+        }
+      };
+
       // Add component to appropriate module type array
-      if (!moduleData[moduleType].includes(componentName)) {
-        moduleData[moduleType].push(componentName);
+      const existingIndex = moduleData[moduleType].findIndex(
+        m => m.staticIdentifier === componentName
+      );
+      
+      if (existingIndex === -1) {
+        moduleData[moduleType].push(moduleEntry);
       }
 
       console.log(`[component-resolver] Mapped ${componentName} as ${moduleType} (without registration)`);
@@ -138,6 +157,9 @@ async function buildComponentMap() {
   // Wait for all components to be processed
   await Promise.all(componentLoadPromises);
 
+  // Store for sharing with other components
+  moduleDataCache = moduleData;
+
   console.log('[component-resolver] Component map built:', {
     SYSTEM: moduleData[MODULE_TYPES.SYSTEM].length,
     SERVICE: moduleData[MODULE_TYPES.SERVICE].length,
@@ -148,7 +170,24 @@ async function buildComponentMap() {
   return { moduleData, componentMap: COMPONENT_MAP };
 }
 
-// Ensure resolver is attached to window only once
+/**
+ * Get module data for all available component types
+ * This can be imported and used by fetchAllModules() as a fallback
+ * @returns {Object} Module data by type
+ */
+export function getModuleData() {
+  if (!moduleDataCache) {
+    console.warn('[component-resolver] getModuleData called before moduleDataCache was initialized');
+    return {
+      [MODULE_TYPES.SYSTEM]: [],
+      [MODULE_TYPES.SERVICE]: [],
+      [MODULE_TYPES.USER]: []
+    };
+  }
+  return moduleDataCache;
+}
+
+// Only initialize the resolver once
 if (typeof window !== 'undefined' && !window.__VAIO_COMPONENT_RESOLVER__) {
   window.__VAIO_COMPONENT_RESOLVER__ = resolveComponent;
 
@@ -160,6 +199,21 @@ if (typeof window !== 'undefined' && !window.__VAIO_COMPONENT_RESOLVER__) {
       SERVICE: moduleData[MODULE_TYPES.SERVICE].length,
       USER: moduleData[MODULE_TYPES.USER].length
     });
+
+    // Handle registration with registry 
+    try {
+      // Import dynamically to avoid circular dependencies
+      import('../Loader/Component/component-registry').then(({ default: registry }) => {
+        if (registry && registry.setModuleData && moduleDataCache) {
+          console.log('[component-resolver] Providing module data to registry');
+          registry.setModuleData(moduleDataCache);
+        }
+      }).catch(err => {
+        console.warn('[component-resolver] Failed to import registry:', err);
+      });
+    } catch (err) {
+      console.warn('[component-resolver] Failed to set module data in registry:', err);
+    }
 
     console.log('✅ Component resolver initialized and ready');
   });
