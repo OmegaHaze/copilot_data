@@ -8,7 +8,7 @@ export default function SupervisorPane({
   id,
   moduleType = 'SYSTEM',
   staticIdentifier = 'SupervisorPane',
-  name = 'Supervisor',
+  name = 'SupervisorPane',
   logo
 }) {
   const [logs, setLogs] = useState('');

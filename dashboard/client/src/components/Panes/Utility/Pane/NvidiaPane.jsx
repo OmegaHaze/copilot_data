@@ -5,11 +5,11 @@ import PaneHeader from '../PaneHeader';
 import GpuPerfGraph from '../../../Panels/panel-modules/GpuGraph/GpuPerfGraph';
 
 export default function NvidiaPane({
-  id, // Full paneId format: SERVICE-NvidiaPane-instanceId
+  id, // Full paneId format: SERVICE-nvidiapane-instanceId
   moduleType = 'SERVICE',
   staticIdentifier = 'NvidiaPane',
-  name = 'NVIDIA GPU',
-  status = 'ONLINE',
+  name = 'NvidiaPane',
+  status = '',
   logo
 }) {
   const mountedRef = useRef(true);

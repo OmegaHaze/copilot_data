@@ -59,8 +59,11 @@ const loadPromise = (async () => {
         const moduleTypeKey = getCanonicalKey(moduleType);
         const moduleData = registry.getModuleData();
 
+        // Modified to use case-insensitive comparison
         const moduleInfo = moduleData[moduleTypeKey]?.find(m =>
-          m.staticIdentifier === staticIdentifier || m.module === staticIdentifier
+          m.staticIdentifier?.toLowerCase() === staticIdentifier.toLowerCase() || 
+          m.module?.toLowerCase() === staticIdentifier.toLowerCase() ||
+          m.paneComponent?.toLowerCase() === staticIdentifier.toLowerCase()
         );
 
         if (moduleInfo?.loadComponent) {

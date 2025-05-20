@@ -14,6 +14,13 @@ const paneModules = import.meta.glob('./*.jsx');
 // This map will be populated when components are requested
 const COMPONENT_MAP = {};
 
+// Export the discovered module data for use in component-index.js
+export let discoveredModuleData = {
+  [MODULE_TYPES.SYSTEM]: [],
+  [MODULE_TYPES.SERVICE]: [],
+  [MODULE_TYPES.USER]: []
+};
+
 /**
  * Component resolver function that will be attached to window
  * This allows the component loader to dynamically resolve components by their staticIdentifier
@@ -109,16 +116,8 @@ async function buildComponentMap() {
         return;
       }
 
-      // Extract moduleType from component's default props or parameters
-      let moduleType = MODULE_TYPES.SYSTEM; // Default
-
-      if (component.defaultProps && component.defaultProps.moduleType) {
-        moduleType = component.defaultProps.moduleType;
-      } else if (componentName === 'SupervisorPane') {
-        moduleType = MODULE_TYPES.SYSTEM;
-      } else if (componentName.includes('Nvidia')) {
-        moduleType = MODULE_TYPES.SERVICE;
-      }
+      // Default to SYSTEM module type
+      let moduleType = MODULE_TYPES.SYSTEM;
 
       // Wrap and cache without registering
       const wrapped = { default: component };
@@ -154,6 +153,9 @@ if (typeof window !== 'undefined' && !window.__VAIO_COMPONENT_RESOLVER__) {
 
   // Initialize the component map without registering components
   buildComponentMap().then(({ moduleData, componentMap }) => {
+    // Store discovered modules in the exported variable for others to use
+    discoveredModuleData = moduleData;
+    
     console.log('[component-resolver] Component map built with:', {
       available: Object.keys(componentMap).length,
       SYSTEM: moduleData[MODULE_TYPES.SYSTEM].length,
@@ -162,6 +164,15 @@ if (typeof window !== 'undefined' && !window.__VAIO_COMPONENT_RESOLVER__) {
     });
 
     console.log('✅ Component resolver initialized and ready');
+    
+    // Dispatch an event that component-index.js can listen for
+    try {
+      window.dispatchEvent(new CustomEvent('vaio:components-discovered', {
+        detail: { moduleData, timestamp: Date.now() }
+      }));
+    } catch (e) {
+      console.warn('[component-resolver] Failed to dispatch discovery event:', e);
+    }
   });
 }
 

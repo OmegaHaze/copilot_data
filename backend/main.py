@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from backend.routes.routes import router as core_router
 from backend.routes.layout.routes_session import router as routes_session
 from backend.routes.layout.pane_layout import router as pane_layout_router
-from backend.routes.user.routes_user import router as routes_user
+# from backend.routes.user.routes_user import router as routes_user
 from backend.routes.user.routes_api_users import router as routes_api_users
 # from backend.routes.module.routes_components import router as component_router
 from backend.core.config import config
@@ -65,7 +65,7 @@ fastapi_app.include_router(core_router)
 fastapi_app.include_router(routes_session)  # Don't add prefix="/api/user" again
 fastapi_app.include_router(pane_layout_router)
 # FIX: Check if routes_user already has a prefix defined; if so, remove this one too
-fastapi_app.include_router(routes_user, prefix="/api/user")
+# fastapi_app.include_router(routes_user, prefix="/api/user")
 fastapi_app.include_router(routes_api_users, prefix="/api")
 # Add component router for serving JSX components with correct MIME types
 # fastapi_app.include_router(component_router)

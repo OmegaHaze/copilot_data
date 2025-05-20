@@ -9,6 +9,7 @@ import { mergeModuleData, validateModulesCollection } from './component-core';
 import { ErrorType, ErrorSeverity } from '../../../../Error-Handling/Diagnostics/types/errorTypes';
 import { errorHandler } from '../../../../Error-Handling/utils/errorHandler';
 import { MODULE_TYPES } from './component-constants';
+import { discoveredModuleData } from '../../Pane/component-resolver';
 
 /**
  * Get map of all registered components
@@ -55,7 +56,59 @@ export async function initComponentSystem() {
       errorHandler.showError(message, errorType, errorSeverity, context);
     });
 
-    const moduleData = await fetchAllModules();
+    // Try to fetch from API
+    let moduleData = await fetchAllModules();
+
+    // Check if backend returned empty modules but we have discovered components
+    const backendEmpty = 
+      (!moduleData[MODULE_TYPES.SYSTEM].length && 
+       !moduleData[MODULE_TYPES.SERVICE].length && 
+       !moduleData[MODULE_TYPES.USER].length);
+    
+    const hasDiscoveredModules = 
+      (discoveredModuleData[MODULE_TYPES.SYSTEM].length > 0 || 
+       discoveredModuleData[MODULE_TYPES.SERVICE].length > 0 || 
+       discoveredModuleData[MODULE_TYPES.USER].length > 0);
+
+    // Populate the database with discovered components if backend is empty
+    if (backendEmpty && hasDiscoveredModules) {
+      console.log("[component-index] Backend returned empty modules but components were discovered - creating modules");
+      
+      // Create modules in backend for each discovered component
+      for (const type in discoveredModuleData) {
+        for (const componentName of discoveredModuleData[type]) {
+          try {
+            const response = await fetch(`/api/modules/${type}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                name: componentName,
+                staticIdentifier: componentName,
+                paneComponent: componentName,
+                visible: true,
+                module: componentName,
+                module_type: type,
+                description: `${componentName} component`,
+                supportsStatus: type === MODULE_TYPES.SERVICE
+              })
+            });
+            
+            if (response.ok) {
+              console.log(`[component-index] Created module for ${componentName}`);
+            } else {
+              console.warn(`[component-index] Failed to create module for ${componentName}: ${response.status}`);
+            }
+          } catch (err) {
+            console.error(`[component-index] Error creating module for ${componentName}:`, err);
+          }
+        }
+      }
+      
+      // Refetch modules after creation
+      moduleData = await fetchAllModules();
+    }
 
     if (!validateModulesCollection(moduleData)) {
       throw new Error('Invalid module data received from API');
@@ -93,6 +146,14 @@ export async function initComponentSystem() {
 
     throw error;
   }
+}
+
+// Listen for component discovery events from resolver
+if (typeof window !== 'undefined') {
+  window.addEventListener('vaio:components-discovered', (event) => {
+    console.log('[component-index] Received component discovery event:', event.detail);
+    // This could trigger initComponentSystem automatically if needed
+  });
 }
 
 // Import after declaration to prevent circular deps

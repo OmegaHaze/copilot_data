@@ -50,6 +50,7 @@ async def get_modules(
 ):
     try:
         if module_type:
+            # No need for normalization if everything is uppercase
             modules = get_modules_by_type(module_type, user_id)
         else:
             modules = get_all_modules()
@@ -66,10 +67,10 @@ async def create_module(
 ):
     try:
         module_type_enum = {
-            "system": ModuleType.SYSTEM,
-            "service": ModuleType.SERVICE,
-            "user": ModuleType.USER
-        }.get(module_type.lower(), ModuleType.USER)
+            "SYSTEM": ModuleType.SYSTEM,
+            "SERVICE": ModuleType.SERVICE,
+            "USER": ModuleType.USER
+        }.get(module_type, ModuleType.USER)
         
         # Generate a proper module key from the name if not explicitly provided
         # This should be a unique identifier for the module, not the module type
