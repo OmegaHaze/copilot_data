@@ -1,5 +1,10 @@
-# (13map) Service registry - Database access for services, modules, and users
-# Handles: Service discovery, module registration, and user management
+# MODULE-FLOW-3.1: Service Registry - Central Module & Service Discovery
+# COMPONENT: Core Services - Module & Service Registry
+# PURPOSE: Provides central access to service and module database records
+# FLOW: Called by routes (MODULE-FLOW-2.x) and service manager (MODULE-FLOW-4.x)
+# ⚡ MFlow-1.0: MODULE REGISTRY & DATABASE LAYER ⚡
+# 🔍 The registry is the central repository of all module information
+# 🔄 Module flowpath: Database → Registry → Service Manager → Socket Handlers
 
 from typing import Optional, List
 from sqlmodel import Session, select
@@ -8,11 +13,21 @@ from sqlalchemy import desc  # Import desc from sqlalchemy for type-safe orderin
 from backend.db.session import engine
 from backend.db.models import Service, User, Module, ModuleType, UserSession
 
+# ⚡ MFlow-1.1: MODULE RETRIEVAL OPERATIONS ⚡
+# 🔍 Database operations for retrieving services and modules
+# 🔄 Direct database access - no intermediate processing
+
+# MODULE-FLOW-3.1.1: Service Listing
+# COMPONENT: Service Registry Functions - Service Discovery
+# PURPOSE: Retrieves all services from the database
+# FLOW: Called by service routes (MODULE-FLOW-2.3) for service listing
 def get_all_services() -> List[Service]:
     with Session(engine) as session:
         statement: SelectOfScalar[Service] = select(Service)
         return list(session.exec(statement))
 
+# ⚡ MFlow-1.2: SERVICE LOOKUPS ⚡
+# 🔍 Service lookups by ID and module relationships
 def get_service_by_id(service_id: int) -> Optional[Service]:
     with Session(engine) as session:
         statement: SelectOfScalar[Service] = select(Service).where(Service.id == service_id)
@@ -23,6 +38,13 @@ def get_services_by_module(module_id: int) -> List[Service]:
         statement: SelectOfScalar[Service] = select(Service).where(Service.module_id == module_id)
         return list(session.exec(statement))
 
+# ⚡ MFlow-1.3: CORE MODULE LOOKUPS ⚡
+# 🔍 Primary module listing functions
+# 🔄 Called by routes and service operations
+# MODULE-FLOW-3.1.2: Module Listing
+# COMPONENT: Service Registry Functions - Module Discovery
+# PURPOSE: Retrieves all modules from the database
+# FLOW: Called by module routes (MODULE-FLOW-2.2) and module tracker (MODULE-FLOW-3.2)
 def get_all_modules() -> List[Module]:
     with Session(engine) as session:
         statement: SelectOfScalar[Module] = select(Module)
@@ -38,6 +60,9 @@ def get_visible_modules() -> List[Module]:
         statement: SelectOfScalar[Module] = select(Module).where(Module.visible)
         return list(session.exec(statement))
 
+# ⚡ MFlow-1.4: MODULE FILTERING ⚡
+# 🔍 Filter modules by type (SYSTEM, SERVICE, USER)
+# 🔄 Used by module listing routes and socket handlers
 def get_modules_by_type(module_type: str, user_id: Optional[int] = None) -> List[Module]:
     try:
         module_type_enum = ModuleType[module_type.upper()]
@@ -50,6 +75,8 @@ def get_modules_by_type(module_type: str, user_id: Optional[int] = None) -> List
             statement = statement.where(Module.user_id == user_id)
         return list(session.exec(statement))
 
+# ⚡ MFlow-1.5: USER MANAGEMENT ⚡
+# 🔍 User database operations
 def get_all_users() -> List[User]:
     with Session(engine) as session:
         statement: SelectOfScalar[User] = select(User)
@@ -65,6 +92,8 @@ def get_user_by_username(username: str) -> Optional[User]:
         statement: SelectOfScalar[User] = select(User).where(User.username == username)
         return session.exec(statement).first()
 
+# ⚡ MFlow-1.6: SESSION & LAYOUT MANAGEMENT ⚡
+# 🔍 User session retrieval for layout persistence
 def get_user_session(user_id: int) -> Optional[UserSession]:
     with Session(engine) as session:
         # For SQLModel with explicit sa_column, reference the column by name string
@@ -75,7 +104,9 @@ def get_user_session(user_id: int) -> Optional[UserSession]:
         )
         return session.exec(statement).first()
 
-
+# ⚡ MFlow-1.7: MODULE REGISTRATION ⚡
+# 🔍 Core module creation/retrieval function
+# 🔄 Used for module registration and lookup
 def create_or_get_module(
     name: str,
     module_key: str,

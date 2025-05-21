@@ -1,41 +1,42 @@
 // module-constants.js
-// Central source of truth for all module-related constants
+// CONSOLIDATION PLAN: IMPORT SHARED CONSTANTS
+// 
+// ⚠️ TRANSITION FILE ⚠️
+// This file now imports constants from component-constants.js
+// rather than declaring its own duplicates.
+// 
+// Eventually, we should update all imports to point directly to
+// component-constants.js and remove this file entirely.
 
-export const MODULE_TYPES = {
-  SYSTEM: 'SYSTEM',
-  SERVICE: 'SERVICE',
-  USER: 'USER'
-};
+/********************************************************************
+ * � CONSOLIDATION NOTE:
+ * 
+ * All shared constants now come from component-constants.js, which
+ * is the canonical source of truth. This file re-exports those
+ * constants to maintain backward compatibility while the transition
+ * is in progress.
+ * 
+ * TRANSITION STEPS:
+ * 1. Update imports here to component-constants.js ✅
+ * 2. Gradually update imports elsewhere to point directly to
+ *    component-constants.js
+ * 3. Eventually remove this file when all references are updated
+ ********************************************************************/
 
-// All modules are persistent and allow multiple instances
-export const MODULE_CONFIG = {
-  [MODULE_TYPES.SYSTEM]: {
-    isPersistent: true,
-    allowMultiple: true,
-  },
-  [MODULE_TYPES.SERVICE]: {
-    isPersistent: true,
-    allowMultiple: true,
-  },
-  [MODULE_TYPES.USER]: {
-    isPersistent: true,
-    allowMultiple: true,
-  }
-};
+import { MODULE_TYPES, STORAGE_KEYS } from '../Component/component-constants';
 
+// Re-export shared constants for backward compatibility
+export { MODULE_TYPES, STORAGE_KEYS };
+
+// Module-specific error messages remain here as they're not shared
 export const ERROR_MESSAGES = {
   INVALID_MODULE_KEY: 'Invalid module key provided',
   MISSING_MODULE_TYPE: 'Missing module type',
   FAILED_TOGGLE: 'Failed to toggle module'
 };
 
-export const STORAGE_KEYS = {
-  MODULE_CACHE: 'vaio_module_cache',
-  ACTIVE_MODULES: 'vaio_active_modules',
-  LAYOUT_CACHE: 'vaio_layouts',
-  SESSION_DATA: 'vaio_session'
-};
-
+// MODULE_CONFIG has been removed as component registry is now
+// the source of truth for module configuration
 
 // export const MODULE_STATUSES = {
 //   LOADING: 'LOADING',

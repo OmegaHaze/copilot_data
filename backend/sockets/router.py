@@ -1,5 +1,10 @@
-# (10map) WebSocket management - Socket.IO event handler registration and streaming
-# Handles: Supervisor socket, service status, backend logs, metrics, PTY handlers
+# MODULE-FLOW-5.1: Socket Router - WebSocket Server Initialization
+# COMPONENT: Socket Services - Socket.IO Event Registration
+# PURPOSE: Initializes and registers all Socket.IO event handlers
+# FLOW: Called by main.py (MODULE-FLOW-A2), registers module handlers (MODULE-FLOW-5.2)
+# MERMAID-FLOW: flowchart TD; MOD5.1[Socket Router] -->|Registers| MOD5.2[Module Handlers];
+#               MOD5.1 -->|Initializes| MOD5.1.1[Service Status Stream];
+#               MOD5.1 -->|Sets Up| MOD5.1.2[System Monitoring]
 
 import asyncio
 import logging
@@ -114,6 +119,12 @@ def register_sio_handlers(sio: AsyncServer):
     loop = asyncio.get_event_loop()
     return loop.create_task(setup_handlers())
 
+# MODULE-FLOW-5.1.3: Module Handler Registration
+# COMPONENT: Socket Services - Delayed Module Handler Registration
+# PURPOSE: Registers module handlers with delayed imports to avoid circular dependencies
+# FLOW: Called by setup_handlers after other handlers are registered
+# MERMAID-FLOW: flowchart TD; MOD5.1.3[Register Module Handlers] -->|Imports| MOD5.2[Module Handler];
+#               MOD5.1.3 -->|Registers With| MOD5.1.3.1[Socket.IO Server]
 def _register_module_handlers_delayed(sio):
     """Delayed import and registration to avoid circular dependencies."""
     try:

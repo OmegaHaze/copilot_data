@@ -29,6 +29,9 @@ export async function resolvePaneComponent(paneId, moduleData = {}) {
       return null;
     }
 
+    // Ensure the component is registered in the registry
+    registry.registerComponent(paneId, component, parsed.moduleType);
+
     return {
       Component: component,
       props: {
@@ -44,6 +47,7 @@ export async function resolvePaneComponent(paneId, moduleData = {}) {
       }
     };
   } catch (error) {
+    console.error(`Failed to resolve pane component for ${paneId}:`, error);
     return null;
   }
 }
@@ -74,6 +78,8 @@ export function renderComponent(paneId, props = {}) {
         if (props.onComponentLoaded && typeof props.onComponentLoaded === 'function') {
           props.onComponentLoaded();
         }
+        // Trigger a re-render by updating the state or notifying listeners
+        registry.notifyListeners('componentLoaded', { key: paneId });
       })
       .catch(() => {});
 

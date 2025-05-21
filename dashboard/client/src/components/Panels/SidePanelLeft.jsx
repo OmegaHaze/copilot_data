@@ -5,6 +5,7 @@ import { useDebugOverlay } from '../Error-Handling/Diagnostics/DebugOverlayConte
 import LaunchButtonSuper from '../Panes/Utility/Launchers/LaunchButtonSuper.jsx'
 import LaunchButtonNvidia from '../Panes/Utility/Launchers/LaunchButtonNvidia.jsx'
 import DebugOverlayButton from '../Error-Handling/Diagnostics/DebugOverlayButton.jsx'
+import ModuleToggle from '../Panes/Utility/Loader/Module/module-toggle.jsx'
 
 
 
@@ -325,7 +326,7 @@ export default function SidePanelLeft({ show, toggle }) {
                     <div className="text-xs mb-1">SUPERVISOR PANE</div>
                     <div className="text-xs opacity-70">System monitoring and process control</div>
                   </div>
-                  <LaunchButtonSuper moduleType="SYSTEM" label="Launch" />
+                  <ModuleToggle slug="SYSTEM" label="Supervisor" />
                 </div>
                 
                 <div className="flex items-center crt-link5 p-1 rounded">

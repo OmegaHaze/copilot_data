@@ -3,6 +3,18 @@
  * Central source of truth for all component-related constants
  */
 
+/********************************************************************
+ * 🟢 KEEP: Primary Source of MODULE_TYPES Constant
+ * 
+ * ASSESSMENT:
+ * This should be the canonical source for MODULE_TYPES.
+ * The duplicate in module-constants.js should be removed.
+ * 
+ * CONSOLIDATION PLAN:
+ * - Keep this implementation
+ * - Update all other files to import from here
+ * - Remove duplicate from module-constants.js
+ ********************************************************************/
 // Module type constants
 export const MODULE_TYPES = {
   SYSTEM: 'SYSTEM',
@@ -10,6 +22,18 @@ export const MODULE_TYPES = {
   USER: 'USER'
 };
 
+/********************************************************************
+ * 🟢 KEEP: Primary Source of STORAGE_KEYS Constant
+ * 
+ * ASSESSMENT:
+ * This should be the canonical source for STORAGE_KEYS.
+ * The duplicate in module-constants.js should be removed.
+ * 
+ * CONSOLIDATION PLAN:
+ * - Keep this implementation
+ * - Update all other files to import from here
+ * - Remove duplicate from module-constants.js
+ ********************************************************************/
 // API endpoints for component operations
 // The frontend is configured to use the plural form 'modules' for the API endpoint.
 export const API_ENDPOINTS = {

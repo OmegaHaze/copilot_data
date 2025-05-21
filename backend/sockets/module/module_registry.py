@@ -4,6 +4,14 @@ This file maintains a registry of active Socket.IO connections for modules.
 It provides shared state without circular dependencies.
 """
 
+# MODULE-FLOW-5.4: Module Registry - Socket Connection Tracking
+# COMPONENT: Socket Services - Connection State Management
+# PURPOSE: Manages WebSocket connection state and status tracking
+# FLOW: Called by socket handlers (MODULE-FLOW-5.2) for state management
+# MERMAID-FLOW: flowchart TD; MOD5.4[Module Registry] -->|Tracks| MOD5.4.1[Socket Connections];
+#               MOD5.4 -->|Manages| MOD5.4.2[Status Cache];
+#               MOD5.4 -->|Coordinates| MOD5.4.3[Watchdog Timers]
+
 import logging
 from typing import Dict, List, Any, Optional
 import asyncio

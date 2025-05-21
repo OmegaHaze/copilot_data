@@ -1,12 +1,12 @@
 import { useContext } from 'react';
-import { SettingsContext } from '../Context/SettingsContext';
-import { useSocket } from '../Context/SocketContext';
-import LaunchButtonSuper from '../Launchers/LaunchButtonSuper';
+import { SettingsContext } from '../../Context/SettingsContext';
+import { useSocket } from '../../Context/SocketContext';
+import LaunchButtonSuper from '../../Launchers/LaunchButtonSuper';
 import { saveModuleState } from './module-operations';
 import { findActiveInstances, hasActiveInstances, removeModule } from './module-operations';
-import { useError } from '../../../Error-Handling/Diagnostics/ErrorNotificationSystem';
+import { useError } from '../../../../Error-Handling/Diagnostics/ErrorNotificationSystem';
 import { ERROR_MESSAGES } from './module-constants';
-import { synchronizeLayoutAndModules } from '../Loader/Layout/layout-shared';
+import { synchronizeLayoutAndModules } from '../../Loader/Layout/layout-shared';
 
 export default function ModuleToggle({ slug, label = null }) {
   const { gridLayout, setGridLayout, activeModules, setActiveModules } = useContext(SettingsContext);

@@ -6,6 +6,20 @@
  */
 
 import { MODULE_TYPES } from '../Loader/Component/component-constants';
+import registry from '../Loader/Component/component-registry';
+
+/********************************************************************
+ * 🧩 COMPONENT DISCOVERY SYSTEM 🧩
+ * 
+ * This file implements a component resolver that:
+ * 1. Uses Vite's import.meta.glob to scan for all component files
+ * 2. Creates a mapping between component identifiers and their modules
+ * 3. Exposes a resolver function for dynamic component loading
+ * 4. Handles component discovery without pre-registration
+ * 
+ * The resolver is attached to window.__VAIO_COMPONENT_RESOLVER__ so
+ * the component loading system can find components by their identifier.
+ ********************************************************************/
 
 // Dynamic imports using Vite's import.meta.glob for auto-discovery
 // Scan all subdirectories of the Panes folder to find components
@@ -37,12 +51,21 @@ export function resolveComponent(staticIdentifier, moduleType) {
     return Promise.resolve(COMPONENT_MAP[staticIdentifier]);
   }
 
+  /********************************************************************
+   * 🔍 COMPONENT FILE RESOLUTION 🔍
+   * 
+   * This is where the system actually loads the React component file:
+   * 1. Looks for a file matching the staticIdentifier.jsx pattern
+   * 2. Loads it dynamically using Vite's import mechanism
+   * 3. Caches the component for future use
+   * 4. Returns it wrapped in a format expected by the component loader
+   ********************************************************************/
   // Look for a file that exports this component
   const modulePath = `./${staticIdentifier}.jsx`;
 
   if (paneModules[modulePath]) {
     console.log(`[component-resolver] Loading ${staticIdentifier} from ${modulePath}`);
-
+    
     // Dynamically load the component
     return paneModules[modulePath]().then(module => {
       const component = module.default;
@@ -95,6 +118,20 @@ async function buildComponentMap() {
     [MODULE_TYPES.USER]: []
   };
 
+  /********************************************************************
+   * 🧩 COMPONENT AUTO-DISCOVERY PROCESS 🧩
+   * 
+   * This is where all available components are discovered:
+   * 1. Scan all JSX files in the component directory
+   * 2. Extract component information and categorize by type
+   * 3. Register base components in registry (but not instances)
+   * 4. Build a mapping for future dynamic imports
+   * 
+   * This process bridges the gap between:
+   * - Physical component files in the filesystem
+   * - The module system's understanding of available components
+   * - Dynamic loading when components are needed
+   ********************************************************************/
   // Scan pane components and extract their moduleType
   const componentNames = extractComponentIdentifiers(paneModules);
   console.log(`[component-resolver] Found ${componentNames.length} potential components`);
@@ -116,8 +153,35 @@ async function buildComponentMap() {
         return;
       }
 
-      // Default to SYSTEM module type
-      let moduleType = MODULE_TYPES.SYSTEM;
+      // Dynamically resolve module type by first checking registry moduleData
+      let moduleType = MODULE_TYPES.SYSTEM; // Default
+      
+      // First try to find the component in the current registry moduleData
+      const registryData = registry.getModuleData();
+      let found = false;
+      
+      // Check all module types for this component
+      for (const type of Object.values(MODULE_TYPES)) {
+        const modules = registryData[type] || [];
+        const matchingModule = modules.find(m => 
+          m.staticIdentifier === componentName || 
+          m.paneComponent === componentName
+        );
+        
+        if (matchingModule) {
+          // Ensure module_type is valid
+          moduleType = matchingModule.module_type || type;
+          found = true;
+          console.log(`[component-resolver] Found ${componentName} in registry with type ${moduleType}`);
+          break;
+        }
+      }
+      
+      // If not found in registry, try the conventional method
+      if (!found) {
+        const registryType = registry.getCategoryForModule(componentName);
+        if (registryType) moduleType = registryType;
+      }
 
       // Wrap and cache without registering
       const wrapped = { default: component };
@@ -126,6 +190,13 @@ async function buildComponentMap() {
       // Add component to appropriate module type array
       if (!moduleData[moduleType].includes(componentName)) {
         moduleData[moduleType].push(componentName);
+      }
+
+      // Register component in ComponentRegistry
+      const registrationKey = `${moduleType}-${componentName}`;
+      if (!registry.hasComponent(registrationKey)) {
+        registry.registerComponent(registrationKey, component, moduleType);
+        console.log(`[component-resolver] Registered ${registrationKey} in ComponentRegistry`);
       }
 
       console.log(`[component-resolver] Mapped ${componentName} as ${moduleType} (without registration)`);

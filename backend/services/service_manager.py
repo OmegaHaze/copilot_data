@@ -1,6 +1,11 @@
 # filepath: /home/vaio/vaio-board/backend/services/service_manager.py
-# (14map) Service manager - Supervisor integration for service lifecycle control
-# Handles: Starting, stopping, and restarting services through Supervisor
+# MODULE-FLOW-4.1: Service Manager - Supervisor Integration
+# COMPONENT: Core Services - Module Lifecycle Control
+# PURPOSE: Controls starting/stopping of modules through Supervisor
+# FLOW: Called by module routes (MODULE-FLOW-2.1) and socket handlers (MODULE-FLOW-5.2)
+# MERMAID-FLOW: flowchart TD; MOD4.1[Service Manager] -->|Calls| MOD4.1.1[Supervisor];
+#               MOD4.1 -->|References| MOD5.3[Module Tracker];
+#               MOD4.1 -->|Updates| MOD5.2.1[Socket Status]
 
 import os
 import subprocess
@@ -20,6 +25,13 @@ SUPERVISOR_SOCK = "/home/vaio/vaio-board/workspace/supervisor/supervisor.sock"
 # Check if supervisor is actually installed and available
 SUPERVISOR_AVAILABLE = os.path.exists(SUPERVISOR_CONF) and os.path.exists(SUPERVISOR_SOCK)
 
+# MODULE-FLOW-4.1.1: Module Status Check
+# COMPONENT: Core Services - Module Status Detection
+# PURPOSE: Gets the current runtime status of a module from supervisor
+# FLOW: Called by socket handlers (MODULE-FLOW-5.2) to deliver status updates
+# MERMAID-FLOW: flowchart TD; MOD4.1.1[Get Status] -->|Checks| MOD4.1.1.1[Supervisor Status];
+#               MOD4.1.1 -->|Lookups| MOD5.3[Module Tracker];
+#               MOD4.1.1 -->|Returns| MOD4.1.1.2[Status String]
 def _get_status(module_name: str) -> str:
     """Get the status of a module from supervisor."""
     if not SUPERVISOR_AVAILABLE:
@@ -69,6 +81,12 @@ def _get_status(module_name: str) -> str:
         logger.error(f"[ServiceManager] Unexpected error checking status for {module_name}: {e}")
         return "UNAVAILABLE"
 
+# MODULE-FLOW-4.1.2: Start Service
+# COMPONENT: Core Services - Module Control
+# PURPOSE: Starts a module service and emits status via socket
+# FLOW: Called by socket handlers (MODULE-FLOW-5.2) to start a module
+# MERMAID-FLOW: flowchart TD; MOD4.1.2[Start Service] -->|Calls| MOD4.1.1[Get Status];
+#               MOD4.1.2 -->|Emits| MOD5.2.1[Socket Status]
 def start_service(module_name: str, sio=None) -> str:
     """Start a service using supervisorctl."""
     try:
@@ -99,6 +117,13 @@ def start_service(module_name: str, sio=None) -> str:
         logger.error(f"[ServiceManager] Unexpected error starting {module_name}: {e}")
         return "ERROR"
 
+# MODULE-FLOW-4.1.3: Stop Service
+# COMPONENT: Core Services - Module Control
+# PURPOSE: Stops a running module service via supervisor
+# FLOW: Called by module routes (MODULE-FLOW-2.1) and socket handlers (MODULE-FLOW-5.2)
+# MERMAID-FLOW: flowchart TD; MOD4.1.3[Stop Service] -->|Calls| MOD4.1.1[Get Status];
+#               MOD4.1.3 -->|Controls| MOD4.1.1.1[Supervisor];
+#               MOD4.1.3 -->|Returns| MOD4.1.3.1[Status String]
 def stop_service(module_name: str) -> str:
     """Stop a service using supervisorctl."""
     if not SUPERVISOR_AVAILABLE:
@@ -122,6 +147,13 @@ def stop_service(module_name: str) -> str:
 
 def uninstall_service(module_name: str) -> str:
     """Uninstall a service through supervisor."""
+    # MODULE-FLOW-4.1.4: Uninstall Service
+    # COMPONENT: Core Services - Module Control
+    # PURPOSE: Uninstalls a module service and removes its configuration
+    # FLOW: Called by socket handlers (MODULE-FLOW-5.2) to uninstall a module
+    # MERMAID-FLOW: flowchart TD; MOD4.1.4[Uninstall Service] -->|Calls| MOD4.1.1[Get Status];
+    #               MOD4.1.4 -->|Removes| MOD5.3[Module Tracker];
+    #               MOD4.1.4 -->|Updates| MOD5.2.1[Socket Status]
     if not SUPERVISOR_AVAILABLE:
         logger.warning(f"[ServiceManager] Supervisor not available, simulating uninstall of {module_name}")
         return "SIMULATED"

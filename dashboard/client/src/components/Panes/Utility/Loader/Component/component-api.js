@@ -78,46 +78,62 @@ export async function fetchModules(type) {
  */
 export async function fetchAllModules() {
   try {
-    console.log('[component-api] Fetching all module types...');
+    console.log('[component-api] Fetching all modules...');
     
-    // Use individual fetch calls with detailed error handling
-    let systemModules = [], serviceModules = [], userModules = [];
+    // Make a single request to get all modules at once
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      console.error(`[component-api] API request for all modules timed out after ${TIMEOUTS.API_REQUEST}ms`);
+    }, TIMEOUTS.API_REQUEST);
     
-    try {
-      systemModules = await fetchModules(MODULE_TYPES.SYSTEM);
-      console.log(`[component-api] Fetched ${systemModules.length} SYSTEM modules`);
-    } catch (sysError) {
-      console.error('[component-api] SYSTEM module fetch error:', sysError);
+    const startTime = Date.now();
+    const response = await fetch(API_ENDPOINTS.MODULES, {
+      signal: controller.signal,
+      headers: {
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache, no-store'
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    const endTime = Date.now();
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch modules: ${response.status}`);
     }
     
-    try {
-      serviceModules = await fetchModules(MODULE_TYPES.SERVICE);
-      console.log(`[component-api] Fetched ${serviceModules.length} SERVICE modules`);
-    } catch (svcError) {
-      console.error('[component-api] SERVICE module fetch error:', svcError);
-    }
+    const allModules = await response.json();
+    console.log('[component-api] Received all modules:', allModules);
     
-    try {
-      userModules = await fetchModules(MODULE_TYPES.USER);
-      console.log(`[component-api] Fetched ${userModules.length} USER modules`);
-    } catch (userError) {
-      console.error('[component-api] USER module fetch error:', userError);
-    }
-    
+    // Group modules by type
     const moduleData = {
-      [MODULE_TYPES.SYSTEM]: Array.isArray(systemModules) ? systemModules : [],
-      [MODULE_TYPES.SERVICE]: Array.isArray(serviceModules) ? serviceModules : [],
-      [MODULE_TYPES.USER]: Array.isArray(userModules) ? userModules : []
+      [MODULE_TYPES.SYSTEM]: [],
+      [MODULE_TYPES.SERVICE]: [],
+      [MODULE_TYPES.USER]: []
     };
     
-    console.log('[component-api] Complete module data:', moduleData);
+    if (Array.isArray(allModules)) {
+      allModules.forEach(module => {
+        // Convert module_type to uppercase to match MODULE_TYPES
+        const type = (module.module_type || '').toUpperCase();
+        if (moduleData[type]) {
+          moduleData[type].push(module);
+        } else {
+          console.warn(`[component-api] Unknown module type: ${module.module_type}`, module);
+        }
+      });
+    }
     
-    // Add a _fetchTime property for debugging
+    console.log('[component-api] Grouped module data:', moduleData);
+    
+    // Add diagnostic data
     moduleData._fetchTime = new Date().toISOString();
+    moduleData._responseTime = endTime - startTime;
     
     return moduleData;
   } catch (error) {
-    console.error('Failed to fetch all modules:', error);
+    console.error('[component-api] Failed to fetch modules:', error);
     return {
       [MODULE_TYPES.SYSTEM]: [],
       [MODULE_TYPES.SERVICE]: [],

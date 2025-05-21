@@ -21,7 +21,7 @@ import {
 } from './session-shared';
 
 import { STORAGE_KEYS } from './session-constants';
-
+import { MODULE_TYPES } from '../Component/component-constants';
 /**
  * Fetch session data and persist it in memory/sessionStorage
  * @returns {Promise<object>} valid session object
@@ -133,8 +133,12 @@ export async function syncLocalStorageToBackend() {
     }
 
     if (modules) {
-      saveToSessionStorage(STORAGE_KEYS.ACTIVE_MODULES, modules);
-      await updateSessionModules(modules);
+      const validModules = modules.filter(moduleId => {
+        const parts = moduleId.split('-');
+        return parts.length === 3 && Object.values(MODULE_TYPES).includes(parts[0]);
+      });
+      saveToSessionStorage(STORAGE_KEYS.ACTIVE_MODULES, validModules);
+      await updateSessionModules(validModules);
     }
 
     return true;

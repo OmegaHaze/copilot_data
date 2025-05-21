@@ -21,13 +21,40 @@ export function createPlaceholder(paneId, message = 'Component not available') {
   );
 }
 
+/********************************************************************
+ * � CONSOLIDATION NOTE:
+ * 
+ * The following functions have been moved to shared-utilities.js:
+ * - getCanonicalKey
+ * - createPaneId (previously createRegistrationKey)
+ * - isValidPaneId
+ * - parsePaneId
+ * 
+ * This file now re-exports them from shared-utilities.js to maintain
+ * backward compatibility during the transition.
+ * 
+ * TRANSITION STEPS:
+ * 1. Move functions to shared-utilities.js ✅
+ * 2. Import and re-export here for backward compatibility ✅
+ * 3. Update imports elsewhere to point to shared-utilities.js
+ * 4. Eventually remove these re-exports when references are updated
+ ********************************************************************/
+
+// Import shared utilities from central location
+import {
+  getCanonicalKey as sharedGetCanonicalKey,
+  createPaneId,
+  isValidPaneId as sharedIsValidPaneId,
+  parsePaneId as sharedParsePaneId
+} from '../Shared/shared-utilities';
+
 /**
  * Normalize a module type string (e.g. 'system' → 'SYSTEM')
  * @param {string} type - Raw module type
  * @returns {string}
  */
 export function getCanonicalKey(type) {
-  return typeof type === 'string' ? type.trim().toUpperCase() : '';
+  return sharedGetCanonicalKey(type);
 }
 
 /**
@@ -38,10 +65,7 @@ export function getCanonicalKey(type) {
  * @returns {string} Composite key like SYSTEM-SupervisorPane or SYSTEM-SupervisorPane-instanceId
  */
 export function createRegistrationKey(moduleType, staticIdentifier, instanceId = null) {
-  const type = getCanonicalKey(moduleType);
-  return instanceId 
-    ? `${type}-${staticIdentifier}-${instanceId}`
-    : `${type}-${staticIdentifier}`;
+  return createPaneId(moduleType, staticIdentifier, instanceId);
 }
 
 /**
@@ -51,7 +75,7 @@ export function createRegistrationKey(moduleType, staticIdentifier, instanceId =
  * @returns {boolean}
  */
 export function isValidPaneId(paneId) {
-  return typeof paneId === 'string' && paneId.split('-').length >= 3;
+  return sharedIsValidPaneId(paneId);
 }
 
 /**
@@ -60,21 +84,21 @@ export function isValidPaneId(paneId) {
  * @returns {object|null}
  */
 export function parsePaneId(paneId) {
-  if (!isValidPaneId(paneId)) return null;
-
-  const parts = paneId.split('-');
-  const moduleType = parts[0];
-  const staticIdentifier = parts[1];
-  const instanceParts = parts.slice(2);
-  const instanceId = instanceParts.length > 0 ? instanceParts.join('-') : null;
-  
-  return {
-    moduleType,
-    staticIdentifier,
-    instanceId,
-    fullId: paneId
-  };
+  return sharedParsePaneId(paneId);
 }
+/********************************************************************
+ * 📝 CONSOLIDATION NOTE:
+ * 
+ * The following functions should eventually be replaced with imports
+ * from shared-utilities.js. However, we're maintaining the original
+ * implementations here temporarily to avoid circular dependencies and
+ * ensure the system works correctly.
+ * 
+ * Phase 2 of the consolidation will address these functions by creating
+ * a better dependency structure that allows direct imports without
+ * circular references.
+ ********************************************************************/
+
 /**
  * Merge module data from multiple module types into a flat array
  * @param {Object} modules - Module data by type

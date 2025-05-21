@@ -22,10 +22,11 @@ export default function LaunchButtonSuper({
     try {
       const fullKey = `${getCanonicalKey(moduleType)}-${staticIdentifier}`;
 
+      // Synchronize layout and modules using context state
       const { layouts: syncedLayout, modules: syncedModules } =
         synchronizeLayoutAndModules(gridLayout, activeModules);
 
-      if (syncedModules.some(id => id.startsWith(`${getCanonicalKey(moduleType)}-${staticIdentifier}`))) {
+      if (syncedModules.some(id => id.startsWith(fullKey))) {
         console.warn(`Instance of ${fullKey} already active. Skipping launch.`);
         setIsLaunching(false);
         return;
@@ -42,68 +43,14 @@ export default function LaunchButtonSuper({
 
       console.log(`Launching ${extractedType}-${extractedId}-${instanceId}`);
 
-      const { layouts: finalLayout, modules: finalModules } =
-        synchronizeLayoutAndModules(nextLayout, nextModules);
+      // Update context state directly
+      setActiveModules(nextModules);
+      setGridLayout(nextLayout);
 
-      try {
-        const { loadComponent } = await import('../../../Panes/Utility/Loader/Component/component-loader');
-        await loadComponent(extractedType, extractedId);
+      // Save state asynchronously
+      saveModuleState(nextLayout, nextModules);
 
-        // Add module data refresh when launching component
-        try {
-          console.log('[LaunchButtonSuper] Refreshing module data after component launch');
-          const { fetchAllModules } = await import('../../../Panes/Utility/Loader/Component/component-api');
-          const registry = (await import('../../../Panes/Utility/Loader/Component/component-registry')).default;
-
-          const moduleData = await fetchAllModules();
-          if (moduleData) {
-            console.log('[LaunchButtonSuper] Fetched fresh module data:', moduleData);
-
-            // Check module data for debugging purposes
-            if (!moduleData.SYSTEM || !Array.isArray(moduleData.SYSTEM)) {
-              console.warn('[LaunchButtonSuper] Invalid SYSTEM module data:', moduleData.SYSTEM);
-            }
-            if (!moduleData.SERVICE || !Array.isArray(moduleData.SERVICE)) {
-              console.warn('[LaunchButtonSuper] Invalid SERVICE module data:', moduleData.SERVICE);
-            }
-            if (!moduleData.USER || !Array.isArray(moduleData.USER)) {
-              console.warn('[LaunchButtonSuper] Invalid USER module data:', moduleData.USER);
-            }
-
-            // Set the data in registry
-            registry.setModuleData(moduleData);
-
-            // Verify the data was set correctly
-            const verifyData = registry.getModuleData();
-            console.log('[LaunchButtonSuper] Verified module data after setting:', verifyData);
-
-            // Dispatch an additional event to help debug overlay
-            try {
-              window.dispatchEvent(new CustomEvent('vaio:launch-button-updated-modules', {
-                detail: {
-                  moduleData: moduleData,
-                  paneId,
-                  timestamp: Date.now()
-                }
-              }));
-            } catch (e) {
-              console.warn('[LaunchButton] Failed to dispatch event:', e);
-            }
-          }
-        } catch (moduleDataError) {
-          console.warn('Failed to refresh module data:', moduleDataError);
-        }
-      } catch (loadError) {
-        console.warn(`Preloading component failed, Grid will retry: ${loadError.message}`);
-      }
-
-      setActiveModules(finalModules);
-      setGridLayout(finalLayout);
-
-      setTimeout(() => {
-        saveModuleState(finalLayout, finalModules);
-      }, 0);
-
+      // Emit socket event
       socket.emit('pane:launched', {
         paneId,
         moduleType: extractedType,

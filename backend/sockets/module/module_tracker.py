@@ -4,6 +4,14 @@ This module provides a central registry for all module operations
 and avoids circular dependencies between socket handlers and service management.
 """
 
+# MODULE-FLOW-5.3: Module Tracker - Centralized Module Info Provider
+# COMPONENT: Socket Services - Module Information Cache
+# PURPOSE: Provides fast, cached module info across system components
+# FLOW: Called by service manager (MODULE-FLOW-4.1) and socket handlers (MODULE-FLOW-5.2)
+# MERMAID-FLOW: flowchart TD; MOD5.3[Module Tracker] -->|Queries| MOD1.3[Module Model];
+#               MOD5.3 -->|Provides Info To| MOD4.1[Service Manager];
+#               MOD5.3 -->|Provides Info To| MOD5.2[Socket Handlers]
+
 import logging
 from typing import Optional, List, Dict
 from sqlmodel import select, Session
@@ -20,6 +28,14 @@ _cache_enabled = True  # Toggle for testing/development
 
 # Use a thread-safe lock for cache operations
 _cache_lock = threading.RLock()
+
+# MODULE-FLOW-5.3.1: Module Lookup Function
+# COMPONENT: Socket Services - Module Lookup
+# PURPOSE: Retrieves module information with caching
+# FLOW: Primary entry point for module information across the system
+# MERMAID-FLOW: flowchart TD; MOD5.3.1[Get Module] -->|Checks| MOD5.3.1.1[Module Cache];
+#               MOD5.3.1 -->|Falls Back To| MOD5.3.1.2[Database Query];
+#               MOD5.3.1 -->|Returns| MOD1.3[Module Data]
 
 def get_module(module_name: str, use_cache: bool = True) -> Optional[Module]:
     """Get module info by its internal module path or ID name.

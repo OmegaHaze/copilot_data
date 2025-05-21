@@ -1,4 +1,13 @@
 # filepath: /home/vaio/vaio-board/backend/sockets/module/module_handler.py
+# MODULE-FLOW-5.2: Module Socket Handler - WebSocket Module Management
+# COMPONENT: Socket Services - Module WebSocket Connections
+# PURPOSE: Manages real-time module communication via WebSockets
+# FLOW: Called by socket router (MODULE-FLOW-5.1), calls service manager (MODULE-FLOW-4.1)
+# MERMAID-FLOW: flowchart TD; MOD5.2[Module Handler] -->|Calls| MOD4.1[Service Manager];
+#               MOD5.2 -->|Uses| MOD5.3[Module Tracker];
+#               MOD5.2 -->|Manages| MOD5.2.1[Module Connections];
+#               MOD5.2 -->|Updates| MOD5.2.2[Status Events]
+
 """Isolated module handler system for WebSocket connections.
 
 This module provides WebSocket event handlers for module management and service control,
@@ -22,6 +31,13 @@ from backend.sockets.module.module_registry import (
 )
 
 logger = logging.getLogger(__name__)
+
+# MODULE-FLOW-5.2.1: Module Info Helper - Isolated Module Lookup
+# COMPONENT: Socket Services - Module Info Retrieval
+# PURPOSE: Fetches module information with circular dependency protection
+# FLOW: Used by handler functions to safely access module tracker
+# MERMAID-FLOW: flowchart TD; MOD5.2.1[Module Info Helper] -->|Calls| MOD5.3[Module Tracker];
+#               MOD5.2.1 -->|Returns| MOD1.3[Module Data]
 
 # Define a function to get module info that isolates the module registry dependency
 def _get_module_info(module_name: str) -> Optional[Any]:

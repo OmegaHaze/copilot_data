@@ -1,16 +1,31 @@
 // module-core.js
-// Core module utilities (non-duplicated)
+// CONSOLIDATION PLAN: MODULE CORE REFACTORING
+//
+// This file will maintain module-specific functionality that isn't shared
+// with the component system. Shared utilities have been moved to
+// shared-utilities.js.
 
+/********************************************************************
+ * � CONSOLIDATION NOTE:
+ *
+ * This file has been refactored to:
+ * 1. Import shared utilities from shared-utilities.js
+ * 2. Remove circular imports with component registry when possible
+ * 3. Remove redundant re-exports
+ * 4. Standardize on component registry as source of truth for config
+ ********************************************************************/
+
+// Still need registry for allowsMultipleInstances - will be addressed in phase 2
 import registry from '../Component/component-registry';
+
+// Import shared utilities from central location
 import {
   getCanonicalKey,
-  createPaneId,
-  getInstanceId,
-  mergeModuleItems,
-  validateModule,
-  validateModules
-} from './module-shared';
-import { MODULE_TYPES } from './module-constants';
+  filterByActiveModules,
+  processModuleData
+} from '../Shared/shared-utilities';
+
+import { MODULE_TYPES } from '../Component/component-constants';
 
 /**
  * Get type of a module by key
@@ -20,6 +35,7 @@ import { MODULE_TYPES } from './module-constants';
 export function getModuleType(moduleKey) {
   if (!moduleKey) return MODULE_TYPES.USER;
 
+  // Use registry.getCategoryForModule as the canonical source of module type
   const category = registry.getCategoryForModule(moduleKey);
   return Object.values(MODULE_TYPES).includes(category)
     ? category
@@ -34,30 +50,6 @@ export function isModule(moduleKey, type) {
 }
 
 /**
- * Generate a unique instance ID for a module
- * Format: Short 4-5 character alphanumeric string (e.g., "1X2YZ")
- */
-export function generateInstanceId(moduleType) {
-  // Create a shorter random ID in the format of 4-5 characters
-  return Math.random().toString(36).substring(2, 7);
-}
-
-/**
- * Filter items based on active modules
- */
-export function filterByActiveModules(items, activeModules) {
-  if (!Array.isArray(items) || !Array.isArray(activeModules)) return [];
-
-  return items.filter(item => {
-    if (!item) return false;
-    const moduleKey = getCanonicalKey(item.module || item.name);
-    return activeModules.some(mod => 
-      getCanonicalKey(mod.module || mod.name) === moduleKey
-    );
-  });
-}
-
-/**
  * Check if a module allows multiple instances
  * @param {string} moduleKey - Module key to check
  * @returns {boolean} - Whether multiple instances are allowed
@@ -65,37 +57,21 @@ export function filterByActiveModules(items, activeModules) {
 export function allowsMultipleInstances(moduleKey) {
   if (!moduleKey) return false;
   
+  // Component registry is now the source of truth for module configuration
   const component = registry.getComponent(moduleKey);
   if (!component) return false;
   
   return component.allowMultipleInstances === true;
 }
 
-/**
- * Process module data into expected shape
- */
-export function processModuleData(modules) {
-  const result = {
-    SYSTEM: [],
-    SERVICE: [],
-    USER: []
-  };
-
-  if (modules && typeof modules === 'object') {
-    if (Array.isArray(modules.SYSTEM)) result.SYSTEM = modules.SYSTEM;
-    if (Array.isArray(modules.SERVICE)) result.SERVICE = modules.SERVICE;
-    if (Array.isArray(modules.USER)) result.USER = modules.USER;
-  }
-
-  return result;
-}
-
-// Re-export shared logic for use in other modules
+// Export functions that are truly module-specific
 export {
-  getCanonicalKey,
-  createPaneId,
-  getInstanceId,
-  mergeModuleItems,
-  validateModule,
-  validateModules
+  // Core module functions
+  getModuleType,
+  isModule,
+  allowsMultipleInstances,
+  
+  // Re-export shared utilities that this file uses
+  filterByActiveModules,
+  processModuleData
 };

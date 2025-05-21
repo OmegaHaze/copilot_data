@@ -1,5 +1,6 @@
-# (1map) Application entry point - FastAPI + Socket.IO server initialization and configuration
+# (A1) Application entry point - FastAPI + Socket.IO server initialization and configuration
 # Handles: Server setup, routing, database init, socket handlers, system modules
+# Flow: A1 -> A2 -> A3 -> A4 -> B1
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,14 +30,15 @@ logger = logging.getLogger(__name__)
 logger.info("Starting vAio Backend server")
 
 # -------------------------------
-# SOCKET.IO SETUP
+# (A2) SOCKET.IO SETUP - Creates socket server and registers handlers
 # -------------------------------
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+# Flow: A2 -> C1 - Register socket handlers from router.py
 register_sio_handlers(sio)
 sio_app = socketio.ASGIApp(sio)
 
 # -------------------------------
-# FASTAPI SETUP
+# (A3) FASTAPI SETUP - Configures REST API server
 # -------------------------------
 fastapi_app = FastAPI(
     title=config.APP_NAME,
@@ -53,13 +55,14 @@ fastapi_app.add_middleware(
 )
 
 
-# DB init
+# (A4) DB initialization - Creates tables and ensures db structure
 init_db()
 
-# Seed system modules
+# Seed system modules (commented out)
 # seed_system_modules()
 
-# REST routes - ensure all API routes are registered before static files
+# (B1) REST routes registration - Attaches all route handlers to API
+# Flow: B1 -> B2 (routes.py contains all route definitions)
 fastapi_app.include_router(core_router)
 # FIX: Remove the additional prefix - routes_session already has prefix="/api/user" defined
 fastapi_app.include_router(routes_session)  # Don't add prefix="/api/user" again

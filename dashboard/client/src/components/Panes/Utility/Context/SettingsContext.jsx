@@ -1,6 +1,7 @@
 // SettingsContext.jsx
 import { createContext, useState, useEffect } from 'react';
 import { loadCompleteSessionState } from '../Loader/Session/session-index';
+import { MODULE_TYPES } from '../Loader/Component/component-constants';
 
 export const SettingsContext = createContext();
 
@@ -31,13 +32,33 @@ export const SettingsProvider = ({ children }) => {
     }, 2000);
   }, []);
 
+  const updateGridLayout = (newLayout) => {
+    if (JSON.stringify(gridLayout) !== JSON.stringify(newLayout)) {
+      setGridLayout(newLayout);
+      console.log('[SettingsContext] Grid layout updated:', newLayout);
+    }
+  };
+
+  const validateModuleIdFormat = (moduleId) => {
+    const parts = moduleId.split('-');
+    return parts.length === 3 && Object.values(MODULE_TYPES).includes(parts[0]);
+  };
+
+  const updateActiveModules = (newModules) => {
+    const validModules = newModules.filter(validateModuleIdFormat);
+    if (JSON.stringify(activeModules) !== JSON.stringify(validModules)) {
+      setActiveModules(validModules);
+      console.log('[SettingsContext] Active modules updated:', validModules);
+    }
+  };
+
   return (
     <SettingsContext.Provider
       value={{
         gridLayout,
-        setGridLayout,
+        setGridLayout: updateGridLayout,
         activeModules,
-        setActiveModules
+        setActiveModules: updateActiveModules
       }}
     >
       {children}

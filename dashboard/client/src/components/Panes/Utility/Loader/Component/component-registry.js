@@ -3,7 +3,26 @@
  * Core registry for managing component references
  */
 
-import { MODULE_TYPES, STORAGE_KEYS } from './component-constants';
+import { MODULE_TYPES, STORAGE_KEYS } from './component-constants.js';
+
+/********************************************************************
+ * 📊 COMPONENT REGISTRY ARCHITECTURE 📊
+ * 
+ * The ComponentRegistry is a singleton that serves as the central
+ * repository for all React components in the dashboard. It handles:
+ * 
+ * 1. Dynamic component loading/registration
+ * 2. Component categorization (SYSTEM, SERVICE, USER)
+ * 3. Component tracking and caching
+ * 4. Event notifications for component lifecycle events
+ * 
+ * The registry works alongside the module system:
+ * - The module system handles what modules are active in the UI
+ * - The component registry handles the actual React components
+ * - Components are referenced by their paneId: "TYPE-IDENTIFIER-INSTANCEID"
+ ********************************************************************/
+
+console.log('MODULE_TYPES:', MODULE_TYPES);
 
 class ComponentRegistry {
   constructor() {
@@ -63,6 +82,10 @@ class ComponentRegistry {
    * @param {any} data - Event data
    */
   notifyListeners(event, data) {
+    if (event === 'componentLoaded') {
+      console.log(`[ComponentRegistry] Component loaded: ${data.key}`);
+      // Trigger grid update or other listeners
+    }
     if (this.eventListeners[event]) {
       this.eventListeners[event].forEach(callback => {
         try {
@@ -86,6 +109,19 @@ class ComponentRegistry {
     
     console.log('[component-registry] Setting module data:', data);
     
+    /********************************************************************
+     * 🔄 MODULE-COMPONENT INTEGRATION POINT 🔄
+     * 
+     * Here the registry stores the module definitions from the backend.
+     * This data includes:
+     * - Module names and identifiers
+     * - Component path information
+     * - Module types (SYSTEM, SERVICE, USER)
+     * 
+     * The registry uses this data to correctly categorize and map
+     * module keys to their components. This forms the bridge between
+     * the backend module definitions and the frontend components.
+     ********************************************************************/
     this.moduleData = {
       [MODULE_TYPES.SYSTEM]: Array.isArray(data[MODULE_TYPES.SYSTEM]) ? [...data[MODULE_TYPES.SYSTEM]] : [],
       [MODULE_TYPES.SERVICE]: Array.isArray(data[MODULE_TYPES.SERVICE]) ? [...data[MODULE_TYPES.SERVICE]] : [],
@@ -103,7 +139,10 @@ class ComponentRegistry {
       console.warn('[component-registry] Failed to dispatch module-data-updated event:', e);
     }
     
-    this.notifyListeners('registryChanged', { type: 'moduleDataUpdated' });
+    this.notifyListeners('registryChanged', { 
+      type: 'moduleDataUpdated',
+      moduleData: this.moduleData
+    });
     
     // Cache module data
     this.cacheModuleData();
@@ -192,52 +231,25 @@ class ComponentRegistry {
   }
 
   /**
-   * Register a component
+   * Register a component if not already registered
    * @param {string} key - Component key
    * @param {Function} component - Component constructor
    * @param {string} moduleType - Module type
    * @returns {boolean} - Success status
    */
   registerComponent(key, component, moduleType) {
-    if (!key || !component) return false;
-
-    // Check if this is a base component (MODULETYPE-STATICID format with no instance ID)
-    const parts = key.split('-');
-    const isBaseComponent = parts.length <= 2;
-    
-    if (isBaseComponent) {
-      console.log(`[ComponentRegistry] Skipping registration of base component ${key}`);
-      
-      // Track in moduleTypes but don't register
-      if (this.moduleTypes[moduleType]) {
-        this.moduleTypes[moduleType].add(key);
-      }
-      
-      // Important: Still add to component map for lookup, but don't notify or fully register
-      if (!this.components.has(key)) {
-        this.components.set(key, component);
-      }
-      
+    if (this.components.has(key)) {
+      console.warn(`[ComponentRegistry] Component ${key} is already registered.`);
       return false;
     }
 
-    // For instance components, check if already exists
-    const alreadyExists = this.components.has(key);
-    if (alreadyExists) {
-      console.warn(`[ComponentRegistry] Component ${key} is already registered. This may indicate a double-registration issue.`);
-      return true; // Return true so the system knows it exists
-    }
-
     this.components.set(key, component);
-
     if (this.moduleTypes[moduleType]) {
       this.moduleTypes[moduleType].add(key);
     }
 
-    console.log(`[ComponentRegistry] Registered component ${key} (${moduleType})`);
     this.notifyListeners('componentLoaded', { key, moduleType });
-    this.notifyListeners('registryChanged', { type: 'componentAdded', key });
-
+    console.log(`[ComponentRegistry] Registered component ${key} (${moduleType})`);
     return true;
   }
 
@@ -381,6 +393,19 @@ class ComponentRegistry {
       console.warn(`[ComponentRegistry] Attempted to unregister component ${key} but it doesn't exist`);
       return false;
     }
+    
+    /********************************************************************
+     * 🔄 COMPONENT LIFECYCLE MANAGEMENT 🔄
+     * 
+     * This is how components are removed from the registry when:
+     * 1. A user removes a module from their dashboard
+     * 2. A pane is closed or replaced
+     * 3. The application is cleaning up resources
+     * 
+     * The module system calls this method (through module-operations.js)
+     * to ensure React components are properly unloaded when modules
+     * are removed.
+     ********************************************************************/
     
     // Don't unregister base components
     const parts = key.split('-');

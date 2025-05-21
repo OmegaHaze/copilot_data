@@ -1,3 +1,11 @@
+# MODULE-FLOW-2.2: Module API Router - Extended Module API Operations
+# COMPONENT: HTTP API - Module APIs for Frontend Integration
+# PURPOSE: Provides refined API endpoints for module management with pagination, filtering
+# FLOW: Entry point for advanced module API access
+# MERMAID-FLOW: flowchart TD; MOD2.2[API Module Router] -->|Queries| MOD3.1[Service Registry];
+#               MOD2.2 -->|Returns| MOD2.2.1[Formatted Module Data];
+#               MOD2.2 -->|Creates| MOD2.2.2[New Module Records]
+
 from fastapi import APIRouter, HTTPException, Query, Depends
 from backend.services.service_registry import (
     get_all_modules,
@@ -43,6 +51,13 @@ class ModuleCreateRequest(BaseModel):
 
 router = APIRouter()
 
+# MODULE-FLOW-2.2.1: Module Listing API - Filtered Module Access
+# COMPONENT: HTTP API - Advanced Module Filtering
+# PURPOSE: Provides filtered module listing with type and user filtering
+# FLOW: Calls service_registry functions based on filter parameters
+# MERMAID-FLOW: flowchart TD; MOD2.2.1[Module Listing API] -->|Filters By| MOD2.2.1.1[Type/User];
+#               MOD2.2.1 -->|Calls| MOD3.1.2[Module Listing Functions]
+
 @router.get("/modules", response_model=List[ModuleResponse])
 async def get_modules(
     module_type: Optional[str] = Query(None, description="Filter by module type (system, service, user)"),
@@ -58,6 +73,13 @@ async def get_modules(
         return [ModuleResponse.model_validate(m) for m in modules]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch modules: {str(e)}")
+
+# MODULE-FLOW-2.2.2: Module Creation API - New Module Record Creation
+# COMPONENT: HTTP API - Module Creation Endpoint
+# PURPOSE: Facilitates the creation of new module records
+# FLOW: Accepts module data, processes creation, and returns the new module record
+# MERMAID-FLOW: flowchart TD; MOD2.2.2[Module Creation API] -->|Creates| MOD2.2.2.1[New Module Record];
+#               MOD2.2.2 -->|Returns| MOD2.2.2.2[Created Module Data]
 
 @router.post("/modules/{module_type}", response_model=ModuleResponse)
 async def create_module(
