@@ -1,37 +1,72 @@
+/**
+ * MODULE-FLOW-8.3: Launch Button Super - Module Creation Button
+ * COMPONENT: UI Layer - User Interaction
+ * PURPOSE: Creates new module instances when clicked
+ * FLOW: Triggers module creation and layout updates
+ * MERMAID-FLOW: flowchart TD; MOD8.3[Launch Button] -->|Creates| MOD8.3.1[Module Instance];
+ *               MOD8.3 -->|Updates| MOD7.1[Settings Context];
+ *               MOD8.3 -->|Emits| MOD7.2[Socket Events]
+ */
+
 import { useState, useContext } from 'react';
 import { SettingsContext } from '../Context/SettingsContext.jsx';
 import { useSocket } from '../Context/SocketContext.jsx';
 import { useError } from '../../../Error-Handling/Diagnostics/ErrorNotificationSystem.jsx';
 import { ErrorType, ErrorSeverity } from '../../../Error-Handling/Diagnostics/types/errorTypes';
-import { addModule, saveModuleState } from '../../../Panes/Utility/Loader/Module/module-operations.js';
-import { getCanonicalKey } from '../../../Panes/Utility/Loader/Module/module-shared.js';
-import { synchronizeLayoutAndModules } from '../../../Panes/Utility/Loader/Layout/layout-shared.js';
 
+// UPDATED IMPORT: Import directly from shared-utilities.js instead of module-shared.js
+import { getCanonicalKey } from '../Loader/Shared/shared-utilities.js';
+import { addModule, saveModuleState } from '../Loader/Module/module-operations.js';
+import { synchronizeLayoutAndModules } from '../Loader/Layout/layout-shared.js';
+
+/**
+ * MODULE-FLOW-8.3.1: Launch Button Super Component
+ * COMPONENT: UI Layer - Button Component
+ * PURPOSE: Creates system module instances
+ * FLOW: Calls module operations to create new instances
+ * @param {Object} props - Component props
+ * @param {string} props.moduleType - Type of module to launch
+ * @param {string} props.staticIdentifier - Component identifier
+ * @param {string} props.label - Button label text
+ * @returns {JSX.Element} - Button component
+ */
 export default function LaunchButtonSuper({
   moduleType = 'SYSTEM',
   staticIdentifier = 'SupervisorPane',
   label = 'Launch Supervisor'
 }) {
+  // State to track button loading state
   const [isLaunching, setIsLaunching] = useState(false);
+  
+  // Context for state and socket
   const { socket } = useSocket();
   const { showError } = useError();
   const { gridLayout, setGridLayout, activeModules, setActiveModules } = useContext(SettingsContext);
 
+  /**
+   * MODULE-FLOW-8.3.2: Launch Handler
+   * COMPONENT: UI Layer - Event Handler
+   * PURPOSE: Handles button click to launch module
+   * FLOW: Adds module, updates state, and saves changes
+   */
   const handleLaunch = async () => {
     setIsLaunching(true);
     try {
+      // Create fully qualified module key with canonical type
       const fullKey = `${getCanonicalKey(moduleType)}-${staticIdentifier}`;
 
       // Synchronize layout and modules using context state
       const { layouts: syncedLayout, modules: syncedModules } =
         synchronizeLayoutAndModules(gridLayout, activeModules);
 
+      // Check if module instance already exists
       if (syncedModules.some(id => id.startsWith(fullKey))) {
         console.warn(`Instance of ${fullKey} already active. Skipping launch.`);
         setIsLaunching(false);
         return;
       }
 
+      // Create new module instance
       const {
         paneId,
         moduleType: extractedType,
@@ -43,6 +78,14 @@ export default function LaunchButtonSuper({
 
       console.log(`Launching ${extractedType}-${extractedId}-${instanceId}`);
 
+      // Preload component if possible
+      try {
+        const { loadComponent } = await import('../Loader/Component/component-loader');
+        await loadComponent(extractedType, extractedId);
+      } catch (loadError) {
+        console.warn(`Preloading component failed, Grid will retry: ${loadError.message}`);
+      }
+
       // Update context state directly
       setActiveModules(nextModules);
       setGridLayout(nextLayout);
@@ -50,7 +93,7 @@ export default function LaunchButtonSuper({
       // Save state asynchronously
       saveModuleState(nextLayout, nextModules);
 
-      // Emit socket event
+      // Emit socket event for other components
       socket.emit('pane:launched', {
         paneId,
         moduleType: extractedType,
@@ -65,6 +108,12 @@ export default function LaunchButtonSuper({
     }
   };
 
+  /**
+   * MODULE-FLOW-8.3.3: Button Rendering
+   * COMPONENT: UI Layer - UI Element
+   * PURPOSE: Renders the launch button with proper state
+   * FLOW: Shows button with loading state
+   */
   return (
     <button
       onClick={handleLaunch}

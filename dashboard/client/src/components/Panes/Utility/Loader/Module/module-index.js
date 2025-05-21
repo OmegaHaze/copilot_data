@@ -1,5 +1,14 @@
 /**
- * module-index.js
+ * MODULE-FLOW-6.0: Module Index - Module System API
+ * COMPONENT: Module System - Public API
+ * PURPOSE: Provides clean, organized interface to the module system
+ * FLOW: Main entry point for all module system functionality
+ * MERMAID-FLOW: flowchart TD; MOD6.0[Module Index] -->|Exports| MOD6.2[Module Operations];
+ *               MOD6.0 -->|Exports| MOD6.3[Module Core];
+ *               MOD6.0 -->|Exports| MOD6.5[Shared Utilities]
+ */
+
+/**
  * CONSOLIDATION PLAN: CLEAN MODULE API SURFACE
  *
  * This file has been refactored to provide a cleaner, more organized
@@ -7,7 +16,7 @@
  */
 
 /********************************************************************
- * � CONSOLIDATION NOTE:
+ * CONSOLIDATION NOTE:
  *
  * This file now:
  * 1. Imports constants from canonical sources
@@ -50,6 +59,11 @@ import {
 } from '../Shared/shared-utilities';
 
 /**
+ * MODULE-FLOW-6.0.1: Module System API - Public Interface
+ * COMPONENT: Module System - API Grouping
+ * PURPOSE: Groups related functionality for clear API
+ * FLOW: Provides organized exports for module system consumers
+ * 
  * MODULE SYSTEM API
  * -----------------
  * The module system provides facilities for managing dashboard modules:
@@ -64,9 +78,9 @@ export {
   MODULE_TYPES,
   
   // Core module type functions
-  getModuleType,
-  isModule,
-  allowsMultipleInstances,
+  getModuleType,        // Get type of module
+  isModule,             // Check if module matches type
+  allowsMultipleInstances, // Check if multiple instances allowed
   
   // Main operations (primary API)
   findActiveInstances,  // Find all instances of a module type

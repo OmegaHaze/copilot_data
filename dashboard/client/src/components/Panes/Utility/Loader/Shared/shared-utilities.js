@@ -1,30 +1,11 @@
 /**
- * shared-utilities.js
- * -----------------------------------------------
- * CONSOLIDATION PLAN: SHARED UTILITIES
- * 
- * This file serves as the canonical source for all shared utility functions
- * used across both the Module and Component systems. By centralizing these
- * utility functions, we eliminate duplication and ensure consistent behavior.
- * 
- * BACKGROUND:
- * Previously, similar or identical functions existed in:
- * 1. module-shared.js 
- * 2. component-core.jsx
- * 
- * This created confusion about which implementation to use and led to 
- * subtle behavioral differences between the systems.
- * 
- * Now, both systems will import from this single source of truth.
- * 
- * ⚠️ CIRCULAR DEPENDENCY WARNING ⚠️
- * There are potential circular dependencies between the Module and Component
- * systems that need careful handling. During the transition phase:
- * 
- * 1. Some consuming files might keep their original implementations temporarily
- * 2. Some imports might need to be dynamic or through intermediary files
- * 3. Phase 2 of consolidation will focus on restructuring the dependency graph
- *    to eliminate these circular references entirely
+ * MODULE-FLOW-6.5: Shared Utilities - Core Utility Functions
+ * COMPONENT: Shared Layer - Common Functionality
+ * PURPOSE: Provides shared utility functions for Module and Component systems
+ * FLOW: Imported by both Module and Component systems
+ * MERMAID-FLOW: flowchart TD; MOD6.5[Shared Utilities] -->|Used by| MOD6.4[Module Shared];
+ *               MOD6.5 -->|Used by| COMP6.5[Component Core];
+ *               MOD6.5 -->|Central| MOD6.5.1[Utility Functions]
  */
 
 /********************************************************************
@@ -35,11 +16,37 @@
  ********************************************************************/
 
 /**
- * Get canonical key from a module/component identifier
- * For example: "system-SupervisorPane" → "SYSTEM"
- * 
+ * MODULE-FLOW-6.5.1: Module ID Utilities - Canonical Key Generation
+ * COMPONENT: Shared Layer - ID Management
+ * PURPOSE: Normalizes module type strings to canonical format
+ * FLOW: Used for module type comparison and identification
  * @param {string} key - The module or component key
  * @returns {string} - The canonical uppercase key or empty string
+ */
+export function processModuleData(modules) {
+  const result = {
+    SYSTEM: [],
+    SERVICE: [],
+    USER: []
+  };
+
+  if (modules && typeof modules === 'object') {
+    if (Array.isArray(modules.SYSTEM)) result.SYSTEM = modules.SYSTEM;
+    if (Array.isArray(modules.SERVICE)) result.SERVICE = modules.SERVICE;
+    if (Array.isArray(modules.USER)) result.USER = modules.USER;
+  }
+
+  return result;
+}
+
+/**
+ * MODULE-FLOW-6.5.12: Module Data Processing - Active Module Filtering
+ * COMPONENT: Shared Layer - Data Processing
+ * PURPOSE: Filters items based on active modules
+ * FLOW: Used to filter available modules to show only active ones
+ * @param {Array} items - Items to filter
+ * @param {Array} activeModules - List of active modules
+ * @returns {Array} - Filtered items that match active modules
  */
 export function getCanonicalKey(key) {
   if (!key) return '';
@@ -48,9 +55,10 @@ export function getCanonicalKey(key) {
 }
 
 /**
- * Create a pane ID from module type, static identifier, and instance ID
- * For example: "SYSTEM", "SupervisorPane", "2X3YZ" → "SYSTEM-SupervisorPane-2X3YZ"
- * 
+ * MODULE-FLOW-6.5.2: Module ID Utilities - Pane ID Creation
+ * COMPONENT: Shared Layer - ID Management
+ * PURPOSE: Creates pane IDs from module type, identifier, and instance ID
+ * FLOW: Used when creating new module instances
  * @param {string} moduleType - The module type (SYSTEM, SERVICE, USER)
  * @param {string} staticIdentifier - The static part of the identifier
  * @param {string} instanceId - Optional instance ID for multiple instances
@@ -66,9 +74,10 @@ export function createPaneId(moduleType, staticIdentifier, instanceId = null) {
 }
 
 /**
- * Extract instance ID from a pane ID
- * For example: "SYSTEM-SupervisorPane-2X3YZ" → "2X3YZ"
- * 
+ * MODULE-FLOW-6.5.3: Module ID Utilities - Instance ID Extraction
+ * COMPONENT: Shared Layer - ID Management
+ * PURPOSE: Extracts instance ID from a pane ID
+ * FLOW: Used to identify specific instances from pane IDs
  * @param {string} paneId - The full pane ID
  * @returns {string|null} - The instance ID or null if invalid
  */
@@ -83,9 +92,10 @@ export function getInstanceId(paneId) {
 }
 
 /**
- * Check if a paneId is valid
- * Expected format: MODULETYPE-STATICID-INSTANCEID
- * 
+ * MODULE-FLOW-6.5.4: Module ID Utilities - Pane ID Validation
+ * COMPONENT: Shared Layer - ID Management
+ * PURPOSE: Validates pane ID format
+ * FLOW: Used to verify IDs before operations
  * @param {string} paneId - The pane ID to validate
  * @returns {boolean} - Whether the pane ID is valid
  */
@@ -94,8 +104,10 @@ export function isValidPaneId(paneId) {
 }
 
 /**
- * Parse a paneId into parts: moduleType, staticIdentifier, instanceId
- * 
+ * MODULE-FLOW-6.5.5: Module ID Utilities - Pane ID Parsing
+ * COMPONENT: Shared Layer - ID Management
+ * PURPOSE: Parses a pane ID into components
+ * FLOW: Used to extract information from pane IDs
  * @param {string} paneId - The pane ID to parse
  * @returns {object|null} - Object with parts or null if invalid
  */
@@ -117,9 +129,10 @@ export function parsePaneId(paneId) {
 }
 
 /**
- * Generate a unique instance ID for a module
- * Format: Short 4-5 character alphanumeric string (e.g., "1X2YZ")
- * 
+ * MODULE-FLOW-6.5.6: Module ID Utilities - Instance ID Generation
+ * COMPONENT: Shared Layer - ID Management
+ * PURPOSE: Generates a unique instance ID for a new module
+ * FLOW: Used when creating new module instances
  * @returns {string} - A unique instance ID
  */
 export function generateInstanceId() {
@@ -134,9 +147,11 @@ export function generateInstanceId() {
  ********************************************************************/
 
 /**
- * Merge module data from multiple sources into a flat array
- * 
- * @param {Object} modules - Module data by type (SYSTEM, SERVICE, USER)
+ * MODULE-FLOW-6.5.7: Module Data Processing - Module Merging
+ * COMPONENT: Shared Layer - Data Processing
+ * PURPOSE: Merges module data from multiple sources
+ * FLOW: Used when combining modules from different sources
+ * @param {Object} modules - Module data by type
  * @returns {Array} - Flat array of all modules
  */
 export function mergeModuleItems(modules) {
@@ -149,8 +164,10 @@ export function mergeModuleItems(modules) {
 }
 
 /**
- * Validate a single module item has required properties
- * 
+ * MODULE-FLOW-6.5.8: Module Data Processing - Module Validation
+ * COMPONENT: Shared Layer - Data Validation
+ * PURPOSE: Validates a single module item
+ * FLOW: Used to verify module data integrity
  * @param {Object} module - Module item to validate
  * @returns {boolean} - Whether the module is valid
  */
@@ -159,8 +176,10 @@ export function validateModule(module) {
 }
 
 /**
- * Validate an array of module items
- * 
+ * MODULE-FLOW-6.5.9: Module Data Processing - Module Collection Validation
+ * COMPONENT: Shared Layer - Data Validation
+ * PURPOSE: Validates an array of module items
+ * FLOW: Used to verify module array integrity
  * @param {Array} modules - Array of module items
  * @returns {boolean} - Whether all modules are valid
  */
@@ -169,8 +188,10 @@ export function validateModules(modules) {
 }
 
 /**
- * Validate that a modules collection has the correct structure
- * 
+ * MODULE-FLOW-6.5.10: Module Data Processing - Module Collection Structure Validation
+ * COMPONENT: Shared Layer - Data Validation
+ * PURPOSE: Validates that a modules collection has the correct structure
+ * FLOW: Used to verify module data from API
  * @param {Object} modules - Module collection to validate
  * @returns {boolean} - Whether the collection is valid
  */
@@ -184,42 +205,22 @@ export function validateModulesCollection(modules) {
 }
 
 /**
- * Process module data into the expected shape
- * 
+ * MODULE-FLOW-6.5.11: Module Data Processing - Module Data Normalization
+ * COMPONENT: Shared Layer - Data Processing
+ * PURPOSE: Processes module data into the expected shape
+ * FLOW: Used to normalize data from different sources
  * @param {Object} modules - Raw module data
  * @returns {Object} - Processed module data with correct structure
  */
-export function processModuleData(modules) {
-  const result = {
-    SYSTEM: [],
-    SERVICE: [],
-    USER: []
-  };
-
-  if (modules && typeof modules === 'object') {
-    if (Array.isArray(modules.SYSTEM)) result.SYSTEM = modules.SYSTEM;
-    if (Array.isArray(modules.SERVICE)) result.SERVICE = modules.SERVICE;
-    if (Array.isArray(modules.USER)) result.USER = modules.USER;
-  }
-
-  return result;
-}
+// Note: Function implementation already exists in the actual file
+// This is just documentation for the existing function
 
 /**
- * Filter items based on active modules
- * 
+ * MODULE-FLOW-6.5.12: Module Data Processing - Active Module Filtering
+ * COMPONENT: Shared Layer - Data Processing
+ * PURPOSE: Filters items based on active modules
+ * FLOW: Used to filter available modules to show only active ones
  * @param {Array} items - Items to filter
  * @param {Array} activeModules - List of active modules
  * @returns {Array} - Filtered items that match active modules
  */
-export function filterByActiveModules(items, activeModules) {
-  if (!Array.isArray(items) || !Array.isArray(activeModules)) return [];
-
-  return items.filter(item => {
-    if (!item) return false;
-    const moduleKey = getCanonicalKey(item.module || item.name);
-    return activeModules.some(mod => 
-      getCanonicalKey(mod.module || mod.name) === moduleKey
-    );
-  });
-}

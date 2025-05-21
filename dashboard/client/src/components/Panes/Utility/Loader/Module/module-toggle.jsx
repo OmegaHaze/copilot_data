@@ -1,3 +1,10 @@
+/**
+ * MODULE-FLOW-8.4: Module Toggle - UI Control for Modules
+ * COMPONENT: UI Layer - Module Management
+ * PURPOSE: Provides toggle button for adding/removing modules
+ * FLOW: Uses module operations to toggle module instances
+ */
+
 import { useContext } from 'react';
 import { SettingsContext } from '../../Context/SettingsContext';
 import { useSocket } from '../../Context/SocketContext';
@@ -8,13 +15,31 @@ import { useError } from '../../../../Error-Handling/Diagnostics/ErrorNotificati
 import { ERROR_MESSAGES } from './module-constants';
 import { synchronizeLayoutAndModules } from '../../Loader/Layout/layout-shared';
 
+/**
+ * MODULE-FLOW-8.4.1: Module Toggle Component
+ * COMPONENT: UI Layer - Toggle Button
+ * PURPOSE: Renders button that toggles module instances
+ * FLOW: Shows add or remove button based on current state
+ * @param {Object} props - Component props
+ * @param {string} props.slug - Module type identifier
+ * @param {string} props.label - Display label
+ * @returns {JSX.Element} - Toggle button component
+ */
 export default function ModuleToggle({ slug, label = null }) {
+  // Use context for global state
   const { gridLayout, setGridLayout, activeModules, setActiveModules } = useContext(SettingsContext);
   const { socket } = useSocket();
   const { showError } = useError();
   
+  // Check if module has active instances
   const hasModuleInstances = hasActiveInstances(slug, activeModules);
 
+  /**
+   * MODULE-FLOW-8.4.2: Module Removal Handler
+   * COMPONENT: UI Layer - Event Handler
+   * PURPOSE: Handles module removal when button clicked
+   * FLOW: Removes instances and updates state
+   */
   const handleRemove = async () => {
     try {
       // First ensure layouts and modules are in sync
@@ -54,7 +79,12 @@ export default function ModuleToggle({ slug, label = null }) {
     }
   };
 
-  // Either launch a new instance or remove existing ones
+  /**
+   * MODULE-FLOW-8.4.3: Toggle Button Rendering
+   * COMPONENT: UI Layer - UI Rendering
+   * PURPOSE: Renders the appropriate button based on state
+   * FLOW: Shows remove button or launch button
+   */
   return (
     <div className="p-2">
       {hasModuleInstances ? (

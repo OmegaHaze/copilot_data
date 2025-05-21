@@ -1,6 +1,12 @@
 /**
- * component-registry.js - Fixed for proper component registration/unregistration
- * Core registry for managing component references
+ * MODULE-FLOW-6.1: Component Registry - Core Component Management
+ * COMPONENT: Component System - Component Repository
+ * PURPOSE: Central registry for all React components in the dashboard
+ * FLOW: Manages component instances, registration, and lookup
+ * MERMAID-FLOW: flowchart TD; MOD6.1[Component Registry] -->|Registers| MOD6.1.1[Components];
+ *               MOD6.1 -->|Referenced by| MOD6.2[Component Loader];
+ *               MOD6.1 -->|Referenced by| MOD6.3[Module Core];
+ *               MOD6.1 -->|Stores| MOD6.1.2[Module Data]
  */
 
 import { MODULE_TYPES, STORAGE_KEYS } from './component-constants.js';
@@ -22,10 +28,18 @@ import { MODULE_TYPES, STORAGE_KEYS } from './component-constants.js';
  * - Components are referenced by their paneId: "TYPE-IDENTIFIER-INSTANCEID"
  ********************************************************************/
 
-console.log('MODULE_TYPES:', MODULE_TYPES);
-
+/**
+ * MODULE-FLOW-6.1.1: Component Registry - Core Registry Class
+ * COMPONENT: Component System - Central Registry Implementation
+ * PURPOSE: Provides centralized component management
+ * FLOW: Instantiated as a singleton and used throughout the system
+ */
 class ComponentRegistry {
   constructor() {
+    // MODULE-FLOW-6.1.1.1: Registry Data Structures - Component Storage
+    // COMPONENT: Component System - Internal Storage
+    // PURPOSE: Stores components, types, errors, and metadata
+    // FLOW: Updated during component registration and lookup
     this.components = new Map();
     this.moduleTypes = {
       [MODULE_TYPES.SYSTEM]: new Set(),
@@ -49,7 +63,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Add event listener
+   * MODULE-FLOW-6.1.2: Event Management - Event Listener Registration
+   * COMPONENT: Component System - Event Notification
+   * PURPOSE: Adds event listeners for registry events
+   * FLOW: Called by consumers to be notified of component changes
    * @param {string} event - Event name
    * @param {Function} callback - Callback function
    * @returns {boolean} - Success status
@@ -63,7 +80,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Remove event listener
+   * MODULE-FLOW-6.1.3: Event Management - Event Listener Removal
+   * COMPONENT: Component System - Event Notification
+   * PURPOSE: Removes event listeners
+   * FLOW: Called during cleanup to prevent memory leaks
    * @param {string} event - Event name
    * @param {Function} callback - Callback to remove
    * @returns {boolean} - Success status
@@ -77,7 +97,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Notify event listeners
+   * MODULE-FLOW-6.1.4: Event Management - Event Notification
+   * COMPONENT: Component System - Event Notification
+   * PURPOSE: Notifies listeners of registry events
+   * FLOW: Called when components are loaded/unloaded
    * @param {string} event - Event name
    * @param {any} data - Event data
    */
@@ -98,7 +121,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Set module data received from API
+   * MODULE-FLOW-6.1.5: Module Data Management - Data Setting
+   * COMPONENT: Component System - Module Data Storage
+   * PURPOSE: Stores module data retrieved from API
+   * FLOW: Called during system initialization
    * @param {Object} data - Module data
    */
   setModuleData(data) {
@@ -149,7 +175,11 @@ class ComponentRegistry {
   }
 
   /**
-   * Cache module data to localStorage
+   * MODULE-FLOW-6.1.6: Data Persistence - Module Data Caching
+   * COMPONENT: Component System - Data Persistence
+   * PURPOSE: Caches module data to localStorage
+   * FLOW: Called after module data is set
+   * @returns {boolean} - Success status
    */
   cacheModuleData() {
     try {
@@ -165,7 +195,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Load cached module data from localStorage
+   * MODULE-FLOW-6.1.7: Data Persistence - Cached Data Loading
+   * COMPONENT: Component System - Data Persistence
+   * PURPOSE: Loads cached module data from localStorage
+   * FLOW: Called during initialization if API fetch fails
    * @returns {Object|null} - Cached module data or null
    */
   loadCachedModuleData() {
@@ -188,7 +221,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Set error handler function
+   * MODULE-FLOW-6.1.8: Error Handling - Error Handler Setting
+   * COMPONENT: Component System - Error Management
+   * PURPOSE: Sets the error handler function
+   * FLOW: Called during initialization to configure error handling
    * @param {Function} handler - Error handler
    */
   setErrorHandler(handler) {
@@ -198,7 +234,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Initialize the registry
+   * MODULE-FLOW-6.1.9: Initialization - Registry Initialization
+   * COMPONENT: Component System - Startup
+   * PURPOSE: Initializes the registry
+   * FLOW: Called during system startup
    * @returns {Promise<boolean>} - Success status
    */
   async initialize() {
@@ -216,7 +255,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Report an error
+   * MODULE-FLOW-6.1.10: Error Handling - Error Reporting
+   * COMPONENT: Component System - Error Management
+   * PURPOSE: Reports errors to the configured handler
+   * FLOW: Called when errors occur in registry operations
    * @param {string} message - Error message
    * @param {string} type - Error type
    * @param {string} severity - Error severity
@@ -231,7 +273,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Register a component if not already registered
+   * MODULE-FLOW-6.1.11: Component Management - Component Registration
+   * COMPONENT: Component System - Component Lifecycle
+   * PURPOSE: Registers a new component in the registry
+   * FLOW: Called by component-loader when a component is loaded
    * @param {string} key - Component key
    * @param {Function} component - Component constructor
    * @param {string} moduleType - Module type
@@ -254,7 +299,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Get a component by key
+   * MODULE-FLOW-6.1.12: Component Management - Component Retrieval
+   * COMPONENT: Component System - Component Lookup
+   * PURPOSE: Gets a component by key
+   * FLOW: Called when rendering components
    * @param {string} key - Component key
    * @returns {Function|null} - Component constructor
    */
@@ -263,7 +311,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Check if a component exists
+   * MODULE-FLOW-6.1.13: Component Management - Component Existence Check
+   * COMPONENT: Component System - Component Lookup
+   * PURPOSE: Checks if a component exists
+   * FLOW: Called before attempting to render a component
    * @param {string} key - Component key
    * @returns {boolean} - Whether component exists
    */
@@ -272,7 +323,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Get all component keys
+   * MODULE-FLOW-6.1.14: Component Management - All Components Listing
+   * COMPONENT: Component System - Component Enumeration
+   * PURPOSE: Gets all component keys
+   * FLOW: Called for diagnostic and admin purposes
    * @returns {Array<string>} - All component keys
    */
   getAllComponentKeys() {
@@ -280,7 +334,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Get all registered component keys
+   * MODULE-FLOW-6.1.15: Component Management - Registered Components Listing
+   * COMPONENT: Component System - Component Enumeration
+   * PURPOSE: Gets all registered component keys
+   * FLOW: Called when listing available components
    * @returns {Array} - Array of all registered component keys
    */
   getAllRegisteredKeys() {
@@ -292,7 +349,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Get instances of a component
+   * MODULE-FLOW-6.1.16: Component Management - Component Instances
+   * COMPONENT: Component System - Instance Management
+   * PURPOSE: Gets instances of a component
+   * FLOW: Called when working with component instances
    * @param {string} key - Component key
    * @returns {Array|null} - Array of instances or null
    */
@@ -305,7 +365,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Set logo URL for a module
+   * MODULE-FLOW-6.1.17: Component Metadata - Logo URL Setting
+   * COMPONENT: Component System - Metadata Management
+   * PURPOSE: Sets logo URL for a module
+   * FLOW: Called during initialization from module data
    * @param {string} key - Module key
    * @param {string} url - Logo URL
    */
@@ -316,7 +379,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Get logo URL for a module
+   * MODULE-FLOW-6.1.18: Component Metadata - Logo URL Retrieval
+   * COMPONENT: Component System - Metadata Management
+   * PURPOSE: Gets logo URL for a module
+   * FLOW: Called when rendering components with logos
    * @param {string} key - Module key
    * @returns {string|null} - Logo URL
    */
@@ -325,7 +391,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Get category/type for a module key
+   * MODULE-FLOW-6.1.19: Module Type Management - Category Determination
+   * COMPONENT: Component System - Module Type Management
+   * PURPOSE: Gets the module type/category for a key
+   * FLOW: Called when determining module type
    * @param {string} key - Module key
    * @returns {string} - Module category (SYSTEM, SERVICE, USER)
    */
@@ -349,7 +418,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Get all module data
+   * MODULE-FLOW-6.1.20: Module Data Management - Data Retrieval
+   * COMPONENT: Component System - Module Data Access
+   * PURPOSE: Gets all module data
+   * FLOW: Called when accessing module definitions
    * @returns {Object} - All module data
    */
   getModuleData() {
@@ -358,7 +430,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Store an error
+   * MODULE-FLOW-6.1.21: Error Management - Error Storage
+   * COMPONENT: Component System - Error Tracking
+   * PURPOSE: Stores an error for a component
+   * FLOW: Called when component loading or rendering fails
    * @param {string} key - Component key
    * @param {Error} error - Error object
    */
@@ -376,7 +451,10 @@ class ComponentRegistry {
   }
 
   /**
-   * Get all errors
+   * MODULE-FLOW-6.1.22: Error Management - Error Retrieval
+   * COMPONENT: Component System - Error Tracking
+   * PURPOSE: Gets all errors
+   * FLOW: Called for diagnostics and debugging
    * @returns {Object} - All errors
    */
   getErrors() {
@@ -384,7 +462,10 @@ class ComponentRegistry {
   }
   
   /**
-   * Unregister a component
+   * MODULE-FLOW-6.1.23: Component Management - Component Unregistration
+   * COMPONENT: Component System - Component Lifecycle
+   * PURPOSE: Unregisters a component
+   * FLOW: Called when removing components
    * @param {string} key - Component key
    * @returns {boolean} - Success status
    */
@@ -438,9 +519,25 @@ class ComponentRegistry {
     
     return true;
   }
+
+  /**
+   * MODULE-FLOW-6.1.24: Module Configuration - Multiple Instances Check
+   * COMPONENT: Component System - Module Configuration
+   * PURPOSE: Checks if a module allows multiple instances
+   * FLOW: Called when determining if another instance can be created
+   * @param {string} key - Module key
+   * @returns {boolean} - Whether multiple instances are allowed
+   */
+  getAllowsMultipleInstances(key) {
+    const component = this.getComponent(key);
+    return component && component.allowMultipleInstances === true;
+  }
 }
 
-// Create singleton instance
+// MODULE-FLOW-6.1.25: Registry Instantiation - Singleton Creation
+// COMPONENT: Component System - Registry Creation
+// PURPOSE: Creates singleton instance of the registry
+// FLOW: Ensures a single registry instance exists for the application
 const registry = new ComponentRegistry();
 
 export default registry;

@@ -1,4 +1,11 @@
-// module-core.js
+// MODULE-FLOW-6.3: Module Core - Core Module Functions
+// COMPONENT: Module System - Type and Configuration
+// PURPOSE: Provides module-specific functionality separate from components
+// FLOW: Used by module-operations.js for all module instance operations
+// MERMAID-FLOW: flowchart TD; MOD6.3[Module Core] -->|Used by| MOD6.2[Module Operations];
+//               MOD6.3 -->|Checks| MOD6.1[Component Registry];
+//               MOD6.3 -->|Uses| MOD6.5[Shared Utilities]
+
 // CONSOLIDATION PLAN: MODULE CORE REFACTORING
 //
 // This file will maintain module-specific functionality that isn't shared
@@ -6,16 +13,17 @@
 // shared-utilities.js.
 
 /********************************************************************
- * � CONSOLIDATION NOTE:
+ * CONSOLIDATION NOTE:
  *
  * This file has been refactored to:
  * 1. Import shared utilities from shared-utilities.js
- * 2. Remove circular imports with component registry when possible
+ * 2. Remove circular imports with component registry where possible 
  * 3. Remove redundant re-exports
  * 4. Standardize on component registry as source of truth for config
  ********************************************************************/
 
-// Still need registry for allowsMultipleInstances - will be addressed in phase 2
+// Import the registry - this creates circular dependency but is needed for now
+// In Phase 2, we'll use a more elegant solution
 import registry from '../Component/component-registry';
 
 // Import shared utilities from central location
@@ -28,7 +36,10 @@ import {
 import { MODULE_TYPES } from '../Component/component-constants';
 
 /**
- * Get type of a module by key
+ * MODULE-FLOW-6.3.1: Module Type Management - Type Detection
+ * COMPONENT: Module System - Type Classification
+ * PURPOSE: Gets the type of a module from its key
+ * FLOW: Used by module operations to determine type-specific behavior
  * @param {string} moduleKey - Module identifier
  * @returns {string} - Module type (SYSTEM, SERVICE, USER)
  */
@@ -43,14 +54,23 @@ export function getModuleType(moduleKey) {
 }
 
 /**
- * Check if module matches a specific type
+ * MODULE-FLOW-6.3.2: Module Type Management - Type Checking
+ * COMPONENT: Module System - Type Validation
+ * PURPOSE: Checks if a module matches a specific type
+ * FLOW: Used for type-specific operations and filtering
+ * @param {string} moduleKey - Module key to check
+ * @param {string} type - Type to check against
+ * @returns {boolean} - Whether module matches type
  */
 export function isModule(moduleKey, type) {
   return getModuleType(moduleKey) === type;
 }
 
 /**
- * Check if a module allows multiple instances
+ * MODULE-FLOW-6.3.3: Module Configuration - Instance Management
+ * COMPONENT: Module System - Instance Control
+ * PURPOSE: Checks if a module allows multiple instances
+ * FLOW: Used when adding new module instances
  * @param {string} moduleKey - Module key to check
  * @returns {boolean} - Whether multiple instances are allowed
  */

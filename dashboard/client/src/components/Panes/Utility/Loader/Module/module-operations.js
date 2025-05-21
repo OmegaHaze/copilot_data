@@ -1,11 +1,19 @@
-// module-operations.js
+// MODULE-FLOW-6.2: Module Operations - Core Module Instance Management
+// COMPONENT: Module System - Instance Lifecycle
+// PURPOSE: Manages module instances and their lifecycle operations
+// FLOW: Core functions for creating, removing, and saving module state
+// MERMAID-FLOW: flowchart TD; MOD6.2[Module Operations] -->|Manages| MOD6.2.1[Module Instances];
+//               MOD6.2 -->|Uses| MOD6.3[Module Core];
+//               MOD6.2 -->|Updates| MOD6.1[Component Registry];
+//               MOD6.2 -->|Saves| MOD6.4[Module State]
+
 // CONSOLIDATION PLAN: MODULE OPERATIONS REFACTORING
 //
 // High-level operations for module management with improved
 // imports and removal of duplicated functionality
 
 /********************************************************************
- * 📝 CONSOLIDATION NOTE:
+ * CONSOLIDATION NOTE:
  *
  * This file has been refactored to:
  * 1. Import shared utilities from shared-utilities.js
@@ -57,19 +65,15 @@ import registry from '../Component/component-registry';
  * 6. PaneGrid renders the component at the specified position
  ********************************************************************/
 
-/******************************************************************
- * ✅ CRITICAL FUNCTION: INSTANCE FINDER ✅
- * 
- * PURPOSE:
- * - Find all active instances of a specific module type
- * - Core dependency for module toggling and batch operations
- * - Essential for synchronizing module state with layout
- * 
- * IMPACT IF REMOVED:
- * - Module toggling would break completely
- * - Instance tracking would fail
- * - Layout synchronization would be impossible
- ******************************************************************/
+/**
+ * MODULE-FLOW-6.2.1: Module Instance Finding - Instance Detection
+ * COMPONENT: Module System - Instance Lookup
+ * PURPOSE: Finds all active instances of a specific module type
+ * FLOW: Used by toggle and remove operations
+ * @param {string} moduleType - Module type to find
+ * @param {Array} activeModules - List of active module IDs
+ * @returns {Array} - List of matching module instance IDs
+ */
 export function findActiveInstances(moduleType, activeModules) {
   if (!Array.isArray(activeModules) || !moduleType) return [];
   const canonical = getCanonicalKey(moduleType);
@@ -80,39 +84,29 @@ export function findActiveInstances(moduleType, activeModules) {
   });
 }
 
-/******************************************************************
- * ✅ CRITICAL FUNCTION: INSTANCE EXISTENCE CHECK ✅
- * 
- * PURPOSE:
- * - Quickly check if any instances of a module type are active
- * - Used by the launcher system to determine toggle state
- * - Required for conditional UI rendering based on module presence
- * 
- * IMPACT IF REMOVED:
- * - Launch buttons would have incorrect toggle state
- * - UI wouldn't know if modules are already open
- * - Toggle operations would need more complex logic
- ******************************************************************/
+/**
+ * MODULE-FLOW-6.2.2: Module Instance Checking - Instance Existence
+ * COMPONENT: Module System - Instance Detection
+ * PURPOSE: Checks if any instances of a module type exist
+ * FLOW: Used by toggle operations and UI components
+ * @param {string} moduleType - Module type to check
+ * @param {Array} activeModules - List of active module IDs
+ * @returns {boolean} - Whether any instances exist
+ */
 export function hasActiveInstances(moduleType, activeModules) {
   return findActiveInstances(moduleType, activeModules).length > 0;
 }
 
-/******************************************************************
- * ⭐️ CORE CRITICAL FUNCTION: MODULE CREATION ⭐️
- * 
- * PURPOSE:
- * - Primary entry point for creating new module instances
- * - Generates unique identifiers for module instances
- * - Creates layout positions for new modules
- * - Core functionality for the entire dashboard system
- * 
- * IMPACT IF REMOVED:
- * - Users couldn't add any modules to the dashboard
- * - No new components could be created or displayed
- * - Launch buttons would fail to create instances
- * 
- * DO NOT MODIFY WITHOUT EXTENSIVE TESTING!
- ******************************************************************/
+/**
+ * MODULE-FLOW-6.2.3: Module Creation - New Instance Creation
+ * COMPONENT: Module System - Instance Creation
+ * PURPOSE: Creates a new module instance
+ * FLOW: Core function for adding modules to dashboard
+ * @param {string} moduleKey - Module key (TYPE-IDENTIFIER)
+ * @param {Array} activeModules - Current active modules
+ * @param {Object} gridLayout - Current grid layout
+ * @returns {Object} - Updated modules, layout, and instance info
+ */
 export async function addModule(moduleKey, activeModules, gridLayout) {
   if (!moduleKey) throw new Error('Module key is required');
 
@@ -150,23 +144,16 @@ export async function addModule(moduleKey, activeModules, gridLayout) {
   };
 }
 
-/******************************************************************
- * ⭐️ CORE CRITICAL FUNCTION: MODULE REMOVAL ⭐️
- * 
- * PURPOSE:
- * - Remove all instances of a specific module type
- * - Clean up layout grid positions
- * - Unregister components from the component registry
- * - Essential for module lifecycle management
- * 
- * IMPACT IF REMOVED:
- * - Users couldn't remove modules from the dashboard
- * - Would cause memory leaks as components stay registered
- * - Layout would get out of sync with active modules
- * - Toggle operations would break (add would work, remove wouldn't)
- * 
- * DO NOT MODIFY WITHOUT EXTENSIVE TESTING!
- ******************************************************************/
+/**
+ * MODULE-FLOW-6.2.4: Module Removal - Instance Removal
+ * COMPONENT: Module System - Instance Removal
+ * PURPOSE: Removes all instances of a module type
+ * FLOW: Core function for removing modules from dashboard
+ * @param {string} moduleType - Module type to remove
+ * @param {Array} activeModules - Current active modules
+ * @param {Object} gridLayout - Current grid layout
+ * @returns {Object} - Updated modules, layout, and removed instances
+ */
 export function removeModule(moduleType, activeModules, gridLayout) {
   const instances = findActiveInstances(moduleType, activeModules);
   if (instances.length === 0) return { activeModules, gridLayout };
@@ -211,19 +198,16 @@ export function removeModule(moduleType, activeModules, gridLayout) {
   };
 }
 
-/******************************************************************
- * ✅ CRITICAL FUNCTION: MODULE TOGGLE ✅
- * 
- * PURPOSE:
- * - Toggle a module type on or off in the dashboard
- * - Convenience wrapper combining add and remove operations
- * - Primary function called by launch buttons and UI controls
- * 
- * IMPACT IF REMOVED:
- * - Launch buttons would need to implement complex toggle logic
- * - User experience for toggling modules would be inconsistent
- * - Most module actions in the UI would fail
- ******************************************************************/
+/**
+ * MODULE-FLOW-6.2.5: Module Toggle - Instance Toggle
+ * COMPONENT: Module System - Instance Control
+ * PURPOSE: Toggles a module type on or off
+ * FLOW: Combines add and remove operations into one function
+ * @param {string} moduleType - Module type to toggle
+ * @param {Array} activeModules - Current active modules
+ * @param {Object} gridLayout - Current grid layout
+ * @returns {Object} - Updated state with action ('added' or 'removed')
+ */
 export async function toggleModule(moduleType, activeModules, gridLayout) {
   const hasInstances = hasActiveInstances(moduleType, activeModules);
   return hasInstances
@@ -231,37 +215,15 @@ export async function toggleModule(moduleType, activeModules, gridLayout) {
     : { ...(await addModule(moduleType, activeModules, gridLayout)), action: 'added' };
 }
 
-/********************************************************************
- * � STORAGE FUNCTION CONSOLIDATION 🔄
- * 
- * The duplicate storage functions have been removed from this file.
- * Instead, they are imported from module-storage.js, which is now
- * the canonical source for these functions.
- * 
- * References:
- * - cacheModuleData is imported from module-storage.js
- * - loadCachedModuleData is imported from module-storage.js
- ********************************************************************/
-
-// No duplicate functions here anymore - they're imported from module-storage.js
-
-/******************************************************************
- * ⭐️ CORE CRITICAL FUNCTION: STATE PERSISTENCE ⭐️
- * 
- * PURPOSE:
- * - Save the complete state of the module system
- * - Persists both layout positions and active module list
- * - Synchronizes layout and modules before saving
- * - Integrates with session system for cross-device persistence
- * 
- * IMPACT IF REMOVED:
- * - User's dashboard state would reset on page refresh
- * - Module positions would not be saved
- * - Active modules would be lost between sessions
- * - User experience would severely degrade
- * 
- * DO NOT MODIFY WITHOUT EXTENSIVE TESTING!
- ******************************************************************/
+/**
+ * MODULE-FLOW-6.2.6: Module State Persistence - State Saving
+ * COMPONENT: Module System - State Management
+ * PURPOSE: Saves complete module system state
+ * FLOW: Persists layout and active modules to storage
+ * @param {Object} gridLayout - Current grid layout
+ * @param {Array} activeModules - Current active modules
+ * @returns {Promise<boolean>} - Success status
+ */
 export async function saveModuleState(gridLayout, activeModules) {
   try {
     const { layouts, modules } = synchronizeLayoutAndModules(gridLayout, activeModules);

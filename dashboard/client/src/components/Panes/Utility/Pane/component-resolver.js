@@ -8,18 +8,7 @@
 import { MODULE_TYPES } from '../Loader/Component/component-constants';
 import registry from '../Loader/Component/component-registry';
 
-/********************************************************************
- * 🧩 COMPONENT DISCOVERY SYSTEM 🧩
- * 
- * This file implements a component resolver that:
- * 1. Uses Vite's import.meta.glob to scan for all component files
- * 2. Creates a mapping between component identifiers and their modules
- * 3. Exposes a resolver function for dynamic component loading
- * 4. Handles component discovery without pre-registration
- * 
- * The resolver is attached to window.__VAIO_COMPONENT_RESOLVER__ so
- * the component loading system can find components by their identifier.
- ********************************************************************/
+
 
 // Dynamic imports using Vite's import.meta.glob for auto-discovery
 // Scan all subdirectories of the Panes folder to find components
@@ -153,53 +142,19 @@ async function buildComponentMap() {
         return;
       }
 
-      // Dynamically resolve module type by first checking registry moduleData
-      let moduleType = MODULE_TYPES.SYSTEM; // Default
-      
-      // First try to find the component in the current registry moduleData
-      const registryData = registry.getModuleData();
-      let found = false;
-      
-      // Check all module types for this component
-      for (const type of Object.values(MODULE_TYPES)) {
-        const modules = registryData[type] || [];
-        const matchingModule = modules.find(m => 
-          m.staticIdentifier === componentName || 
-          m.paneComponent === componentName
-        );
-        
-        if (matchingModule) {
-          // Ensure module_type is valid
-          moduleType = matchingModule.module_type || type;
-          found = true;
-          console.log(`[component-resolver] Found ${componentName} in registry with type ${moduleType}`);
-          break;
-        }
-      }
-      
-      // If not found in registry, try the conventional method
-      if (!found) {
-        const registryType = registry.getCategoryForModule(componentName);
-        if (registryType) moduleType = registryType;
-      }
-
       // Wrap and cache without registering
       const wrapped = { default: component };
       COMPONENT_MAP[componentName] = wrapped;
-
-      // Add component to appropriate module type array
-      if (!moduleData[moduleType].includes(componentName)) {
-        moduleData[moduleType].push(componentName);
+      
+      // Add to USER module data by default for display purposes only
+      // The actual module type is determined by the Pane itself elsewhere
+      if (!moduleData[MODULE_TYPES.USER].includes(componentName)) {
+        moduleData[MODULE_TYPES.USER].push(componentName);
       }
 
-      // Register component in ComponentRegistry
-      const registrationKey = `${moduleType}-${componentName}`;
-      if (!registry.hasComponent(registrationKey)) {
-        registry.registerComponent(registrationKey, component, moduleType);
-        console.log(`[component-resolver] Registered ${registrationKey} in ComponentRegistry`);
-      }
-
-      console.log(`[component-resolver] Mapped ${componentName} as ${moduleType} (without registration)`);
+      // Don't register components here - let the registry handle it based on the Pane's own type
+      // This completely removes any type determination from the resolver
+      console.log(`[component-resolver] Component ${componentName} mapped (without registration)`);
     } catch (err) {
       console.error(`[component-resolver] Failed to analyze ${componentName}:`, err);
     }
