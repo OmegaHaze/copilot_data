@@ -21,7 +21,7 @@ from backend.routes.env.routes_metrics_history import router as metrics_history_
 from backend.routes.env.routes_system_info import router as system_info_router
 from backend.routes.env.routes_ml_environment import router as ml_environment_router
 from backend.routes.env.routes_commands import router as commands_router
-
+from backend.routes.component.routes_component_resolver import router as component_resolver_router
 # Create the central router
 router = APIRouter()
 
@@ -39,6 +39,7 @@ router.include_router(status_router, prefix="/api/service", tags=["Service Statu
 router.include_router(api_services_router, prefix="/api", tags=["Services API"])
 
 # ===== MODULES =====
+router.include_router(component_resolver_router, prefix="/api", tags=["Components"])
 router.include_router(module_router, prefix="/api/modules", tags=["Modules"])
 router.include_router(api_modules_router, prefix="/api", tags=["Modules API"])
 router.include_router(module_installer_router, prefix="/api/modules/installer", tags=["Module Installation"])

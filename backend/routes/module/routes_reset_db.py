@@ -41,9 +41,10 @@ async def reset_database(session: Session = Depends(get_session)):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@router.delete("/clear-db")
+# FIXED: Changed from @router.delete to @router.post to match frontend expectation
+@router.post("/clear-db")
 async def clear_database():
-    """Clear the database tables without reseeding."""
+    """Clear the database tables without reseeding - now accepts POST to match frontend"""
     try:
         # Drop all tables and recreate them
         from sqlmodel import SQLModel

@@ -8,10 +8,13 @@ import { getCanonicalKey } from './module-shared';
 
 // API endpoints
 const API_ENDPOINTS = {
-  MODULES: '/api/modules',
-  MODULE: '/api/modules/:type',
+  MODULES: '/api/modules/registry',
+  MODULE: '/api/modules/:type',  // Fixed to remove -info suffix
   MODULE_ID: '/api/modules/:type/:id',
-  SESSION: '/api/session'
+  SESSION: '/api/session',
+  RESET_DB: '/api/modules/reset-db',
+  CLEAR_DB: '/api/modules/clear-db',
+  SYSTEM_INFO: '/api/system/system-info'  // Added properly namespaced system info endpoint
 };
 
 // Timeouts
@@ -177,7 +180,7 @@ export async function resetModuleDatabase() {
   try {
     console.log('[module-api] Resetting module database...');
     
-    const response = await fetch(`${API_ENDPOINTS.MODULES}/reset-db`, {
+    const response = await fetch(API_ENDPOINTS.RESET_DB, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -207,7 +210,7 @@ export async function clearModuleDatabase() {
   try {
     console.log('[module-api] Clearing module database...');
     
-    const response = await fetch(`${API_ENDPOINTS.MODULES}/clear-db`, {
+    const response = await fetch(API_ENDPOINTS.CLEAR_DB, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

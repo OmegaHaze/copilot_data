@@ -92,52 +92,6 @@ def stop(slug: str, request: Request):
     stop_service(slug)
     return {"status": "stopped"}
 
-# MODULE-FLOW-2.1.7: System Information Endpoint
-# COMPONENT: HTTP API - System Info Provider
-# PURPOSE: Provides hardware and system context for module operations
-# FLOW: Gathers system information for module compatibility checks
-# MERMAID-FLOW: flowchart TD; MOD2.1.7[System Info Endpoint] -->|Provides| MOD2.1.7.1[System Stats];
-#               MOD2.1.7 -->|Supports| MOD3.2[Module Installer]
-@router.get("/system-info")
-def get_system_info():
-    """Get system information including CPU details"""
-    try:
-        # CPU information
-        cpu_count = psutil.cpu_count(logical=False)
-        cpu_count_logical = psutil.cpu_count(logical=True)
-        cpu_model = ""
-        try:
-            # Try to get CPU model from /proc/cpuinfo (Linux)
-            with open("/proc/cpuinfo", "r") as f:
-                for line in f:
-                    if "model name" in line:
-                        cpu_model = line.split(":", 1)[1].strip()
-                        break
-        except Exception:
-            cpu_model = "CPU Model"
-        
-        # Memory information
-        memory = psutil.virtual_memory()
-        
-        return {
-            "system": {
-                "hostname": platform.node(),
-                "platform": platform.system(),
-                "release": platform.release(),
-                "version": platform.version(),
-                "machine": platform.machine(),
-                "cpu": {
-                    "model": cpu_model,
-                    "physical_cores": cpu_count,
-                    "logical_cores": cpu_count_logical,
-                    "cores": cpu_count_logical  # For backward compatibility
-                },
-                "memory": {
-                    "total": memory.total,
-                    "available": memory.available,
-                    "percent": memory.percent
-                }
-            }
-        }
-    except Exception as e:
-        return {"error": str(e)}
+# MODULE-FLOW-2.1.7: System Information Endpoint - MOVED TO routes_system_info.py
+# This endpoint has been moved to the routes_system_info.py file
+# Now accessible at /api/system-info instead of /api/modules/system-info

@@ -174,3 +174,40 @@ def get_nvidia_info():
             "timestamp": datetime.now().isoformat()
         }
 
+@router.get("/system-info")
+def get_simplified_system_info():
+    """Get simplified system information including CPU details (for backward compatibility)"""
+    try:
+        # Use the main system info function but reformat the output
+        full_info = get_system_info()
+        
+        if "error" in full_info:
+            return {"error": full_info["error"]}
+            
+        # Extract the data from the full info
+        data = full_info.get("data", {})
+        
+        # Format in the legacy structure 
+        return {
+            "system": {
+                "hostname": platform.node(),
+                "platform": platform.system(),
+                "release": platform.release(),
+                "version": platform.version(),
+                "machine": platform.machine(),
+                "cpu": {
+                    "model": data.get("cpu", {}).get("model", "Unknown CPU"),
+                    "physical_cores": data.get("cpu", {}).get("physical_cores", 0),
+                    "logical_cores": data.get("cpu", {}).get("logical_cores", 0),
+                    "cores": data.get("cpu", {}).get("logical_cores", 0)  # For backward compatibility
+                },
+                "memory": {
+                    "total": data.get("memory", {}).get("total", 0),
+                    "available": data.get("memory", {}).get("available", 0),
+                    "percent": data.get("memory", {}).get("percent", 0)
+                }
+            }
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
