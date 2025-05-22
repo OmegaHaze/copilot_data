@@ -40,14 +40,20 @@ async def clear_database():
         # Get the absolute path to the reset_db.py script
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
         
-        # Create a temporary script to just drop tables
+        # Create a temporary script to just drop tables with CASCADE
         temp_script = """
 from sqlmodel import SQLModel
+from sqlalchemy import text
 from backend.db.session import engine
 import backend.db.models  # This imports all models
 
-print("Dropping all tables...")
-SQLModel.metadata.drop_all(engine)
+print("Dropping all tables with CASCADE...")
+# Use raw SQL to drop tables with CASCADE option
+with engine.begin() as conn:
+    conn.execute(text("DROP SCHEMA public CASCADE"))
+    conn.execute(text("CREATE SCHEMA public"))
+    conn.execute(text("GRANT ALL ON SCHEMA public TO postgres"))
+    conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
 print("Database cleared successfully!")
         """
         

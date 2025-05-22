@@ -98,7 +98,7 @@ def stop(slug: str, request: Request):
 # FLOW: Gathers system information for module compatibility checks
 # MERMAID-FLOW: flowchart TD; MOD2.1.7[System Info Endpoint] -->|Provides| MOD2.1.7.1[System Stats];
 #               MOD2.1.7 -->|Supports| MOD3.2[Module Installer]
-@router.get("/system")
+@router.get("/system-info")
 def get_system_info():
     """Get system information including CPU details"""
     try:

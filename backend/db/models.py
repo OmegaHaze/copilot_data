@@ -220,3 +220,30 @@ class ServiceError(SQLModel, table=True):
     
     service_id: Optional[int] = Field(default=None, foreign_key="service.id")  # Added service foreign key
     service_relation: Optional[Service] = Relationship()  # Added service relationship
+
+
+# MODULE-FLOW-1.8: ErrorAnalytics Model Definition
+# COMPONENT: Database Schema - Error Analytics and Metrics
+# PURPOSE: Tracks and analyzes errors for services for reporting and diagnostics
+# FLOW: Referenced by error handling system for metrics and trends
+# MERMAID-FLOW: flowchart TD; MOD1.8[ErrorAnalytics] -->|Analyzes| MOD1.7[ServiceError];
+#               MOD1.8 -->|References| MOD1.4[Service Model];
+#               MOD1.8 -->|Provides| MOD6.2[Error Analytics Dashboard]
+class ErrorAnalytics(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    service_id: int = Field(foreign_key="service.id")  # Foreign key to service table
+    error_count: int = Field(default=0)
+    last_error_timestamp: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True))
+    )
+    first_error_timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False)
+    )
+    error_pattern: Optional[str] = None
+    is_resolved: bool = Field(default=False)
+    resolution_notes: Optional[str] = None
+    
+    # Reference to the service
+    service: Service = Relationship()

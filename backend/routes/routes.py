@@ -34,7 +34,7 @@ from backend.routes.layout.pane_layout import router as session_router
 # Metrics / Environment
 # -----------------------------
 from backend.routes.env.routes_metrics_history import router as metrics_history_router
-from backend.routes.env.routes_system_info import router as system_router
+from backend.routes.env.routes_system_info import router as system_info_router
 from backend.routes.env.routes_ml_environment import router as ml_environment_router
 # -----------------------------
 # Commands Setup
@@ -91,8 +91,8 @@ router.include_router(session_router, prefix="/api/user", tags=["User Sessions"]
 # Metrics / Environment
 # -----------------------------
 router.include_router(metrics_history_router, tags=["Metrics History"])
-router.include_router(system_router, prefix="/api/system", tags=["System Info"])
-router.include_router(ml_environment_router, prefix="/api", tags=["ML Environment"])
+router.include_router(system_info_router, prefix="/api/system-info", tags=["System Info"])
+router.include_router(ml_environment_router, prefix="/api/ml-environment", tags=["ML Environment"])
 
 
 # -----------------------------
