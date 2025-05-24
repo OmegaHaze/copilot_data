@@ -18,10 +18,15 @@ export function cacheModuleData(data) {
       return false;
     }
     
-    localStorage.setItem(STORAGE_KEYS.MODULE_CACHE, JSON.stringify({
-      timestamp: Date.now(),
+    const timestamp = Date.now();
+    const cachedData = {
+      timestamp,
       data
-    }));
+    };
+    
+    // Keep both storages in sync
+    localStorage.setItem(STORAGE_KEYS.MODULE_REGISTRY, JSON.stringify(cachedData));
+    localStorage.setItem(STORAGE_KEYS.MODULE_CACHE, JSON.stringify(cachedData));
     
     return true;
   } catch (err) {
@@ -37,21 +42,46 @@ export function cacheModuleData(data) {
  */
 export function loadCachedModuleData(maxAge = 24 * 60 * 60 * 1000) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.MODULE_CACHE);
-    if (!raw) return null;
+    // First try the registry (primary source)
+    const registryRaw = localStorage.getItem(STORAGE_KEYS.MODULE_REGISTRY);
+    if (registryRaw) {
+      try {
+        const registryParsed = JSON.parse(registryRaw);
+        
+        // Check if registry data is stale
+        if (Date.now() - registryParsed.timestamp <= maxAge) {
+          if (validateModulesCollection(registryParsed.data)) {
+            console.log('[module-storage] Using module data from registry');
+            return registryParsed.data;
+          }
+        }
+      } catch (registryErr) {
+        console.warn('[module-storage] Failed to parse registry data:', registryErr);
+      }
+    }
     
-    const parsed = JSON.parse(raw);
+    // Fall back to cache if registry didn't work
+    const cacheRaw = localStorage.getItem(STORAGE_KEYS.MODULE_CACHE);
+    if (!cacheRaw) return null;
+    
+    const cacheParsed = JSON.parse(cacheRaw);
     
     // Check if cache is stale
-    if (Date.now() - parsed.timestamp > maxAge) {
+    if (Date.now() - cacheParsed.timestamp > maxAge) {
       console.log('[module-storage] Module cache is stale');
       return null;
     }
     
-    if (!validateModulesCollection(parsed.data)) {
+    if (!validateModulesCollection(cacheParsed.data)) {
       console.warn('[module-storage] Invalid cached module data');
       return null;
     }
+    
+    // If we're using cache data, sync it back to the registry
+    localStorage.setItem(STORAGE_KEYS.MODULE_REGISTRY, JSON.stringify({
+      timestamp: Date.now(),
+      data: cacheParsed.data
+    }));
     
     return parsed.data;
   } catch (err) {
@@ -144,5 +174,72 @@ export function clearModuleCaches() {
   } catch (err) {
     console.warn('[module-storage] Failed to clear caches:', err);
     return false;
+  }
+}
+
+/**
+ * Clear all module-related localStorage data
+ * This removes all cached modules, registry, active modules, and layout data
+ * @param {boolean} verbose - Whether to log detailed information about what's being cleared
+ * @returns {Object} Result with success status and details of what was cleared
+ */
+export function clearModuleStorage(verbose = false) {
+  try {
+    console.log('[module-storage] Clearing all module-related localStorage data');
+    
+    // Create a list of keys to clear
+    const keysToRemove = [
+      // Module specific keys
+      STORAGE_KEYS.MODULE_CACHE,
+      STORAGE_KEYS.MODULE_REGISTRY,
+      STORAGE_KEYS.ACTIVE_MODULES,
+      STORAGE_KEYS.LAYOUT_CACHE,
+      STORAGE_KEYS.SESSION_DATA,
+      
+      // Legacy keys that might still exist
+      'vaio_module_cache',
+      'vaio_module_registry',
+      'vaio_layouts',
+      'vaio_active_modules',
+      'vaio_session',
+      
+      // Any other related caches
+      'vaio_ui_state',
+      'vaio_user_preferences'
+    ];
+    
+    // Track what was removed
+    const removed = [];
+    const failed = [];
+    
+    // Remove each key
+    keysToRemove.forEach(key => {
+      try {
+        // Check if it exists first
+        if (localStorage.getItem(key)) {
+          localStorage.removeItem(key);
+          removed.push(key);
+          if (verbose) console.log(`[module-storage] Removed localStorage key: ${key}`);
+        }
+      } catch (keyError) {
+        failed.push({ key, error: keyError.message });
+        if (verbose) console.warn(`[module-storage] Failed to remove key ${key}:`, keyError);
+      }
+    });
+    
+    console.log(`[module-storage] Successfully cleared ${removed.length} localStorage keys`);
+    
+    // Return detailed information
+    return {
+      success: true,
+      keysRemoved: removed,
+      keysFailed: failed
+    };
+  } catch (err) {
+    console.error('[module-storage] Failed to clear module storage:', err);
+    return {
+      success: false,
+      error: err.message
+    };
   }
 }

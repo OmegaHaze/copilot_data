@@ -1,5 +1,16 @@
 /**
- * module-api.js
+ * m// API endpoints
+const API_ENDPOINTS = {
+  MODULES: '/api/modules',
+  MODULE_ID: '/api/modules/:type/:id',
+  CREATE_MODULE: '/api/modules/:type', // ADD THIS - matches backend
+  RESET_DB: '/api/modules/reset-db',
+  CLEAR_DB: '/api/modules/clear-db',
+  // New simplified GET endpoints
+  RESET_MODULE_DB: '/api/modules/reset-module-db',
+  CLEAR_ALL_DB: '/api/modules/clear-all-db',
+  SYSTEM_INFO: '/api/system/system-info'  // Added properly namespaced system info endpoint
+};
  * Functions for interacting with module-related APIs
  */
 
@@ -9,11 +20,13 @@ import { getCanonicalKey } from './module-shared';
 // API endpoints
 const API_ENDPOINTS = {
   MODULES: '/api/modules/registry',
-  MODULE: '/api/modules/:type',  // Fixed to remove -info suffix
   MODULE_ID: '/api/modules/:type/:id',
-  SESSION: '/api/session',
+  CREATE_MODULE: '/api/modules/:type', // ADD THIS - matches backend
   RESET_DB: '/api/modules/reset-db',
   CLEAR_DB: '/api/modules/clear-db',
+  // New simplified GET endpoints
+  RESET_MODULE_DB: '/api/modules/reset-module-db',
+  CLEAR_ALL_DB: '/api/modules/clear-all-db',
   SYSTEM_INFO: '/api/system/system-info'  // Added properly namespaced system info endpoint
 };
 
@@ -46,17 +59,26 @@ export async function fetchModules() {
     const allModules = await response.json();
     console.log('[module-api] Received modules:', allModules);
     
-    // Initialize with MODULE_TYPES keys - make sure to use the actual keys from MODULE_TYPES
+    // Initialize with MODULE_TYPES keys - ensure each type has an array
     const moduleData = {};
-    Object.keys(MODULE_TYPES).forEach(key => {
-      moduleData[MODULE_TYPES[key]] = [];
+    Object.values(MODULE_TYPES).forEach(type => {
+      // Explicitly create an empty array for each module type
+      moduleData[type] = [];
     });
     
+    // Additional safeguard - double-check that all required keys exist with arrays
+    if (!moduleData.SYSTEM || !Array.isArray(moduleData.SYSTEM)) moduleData.SYSTEM = [];
+    if (!moduleData.SERVICE || !Array.isArray(moduleData.SERVICE)) moduleData.SERVICE = [];
+    if (!moduleData.USER || !Array.isArray(moduleData.USER)) moduleData.USER = [];
+    
     if (Array.isArray(allModules)) {
+      console.log('[module-api] Processing array of modules:', allModules.length);
       allModules.forEach(module => {
         // Get canonical key (normalized module type)
         const rawType = module.module_type || module.moduleType || 'SYSTEM';
         const type = getCanonicalKey(rawType);
+        
+        console.log(`[module-api] Processing module of type ${type}:`, module);
         
         // Make sure we're only adding to known module types
         if (!moduleData[type]) {
@@ -75,6 +97,13 @@ export async function fetchModules() {
       });
     }
     
+    // Log the structure to verify it's correct before returning
+    console.log('[module-api] Processed module data structure:', {
+      SYSTEM: Array.isArray(moduleData.SYSTEM) ? moduleData.SYSTEM.length : 'Not an array',
+      SERVICE: Array.isArray(moduleData.SERVICE) ? moduleData.SERVICE.length : 'Not an array',
+      USER: Array.isArray(moduleData.USER) ? moduleData.USER.length : 'Not an array'
+    });
+    
     // Add diagnostic data
     moduleData._fetchTime = new Date().toISOString();
     moduleData._responseTime = endTime - startTime;
@@ -84,15 +113,28 @@ export async function fetchModules() {
     console.error('[module-api] Failed to fetch modules:', error);
     
     // Create empty object with all required type arrays
-    const emptyResult = {};
-    Object.keys(MODULE_TYPES).forEach(key => {
-      emptyResult[MODULE_TYPES[key]] = [];
+    const emptyResult = {
+      SYSTEM: [],
+      SERVICE: [],
+      USER: []
+    };
+    
+    // Double check that all required types are set as arrays using MODULE_TYPES enum
+    Object.values(MODULE_TYPES).forEach(type => {
+      if (!emptyResult[type] || !Array.isArray(emptyResult[type])) {
+        emptyResult[type] = [];
+      }
     });
     
     return {
       ...emptyResult,
       _error: error.message,
-      _fetchTime: new Date().toISOString()
+      _fetchTime: new Date().toISOString(),
+      _apiStatus: {
+        SYSTEM: { ok: false },
+        SERVICE: { ok: false },
+        USER: { ok: false }
+      }
     };
   }
 }
@@ -178,14 +220,15 @@ export async function getModuleById(moduleType, moduleId) {
  */
 export async function resetModuleDatabase() {
   try {
-    console.log('[module-api] Resetting module database...');
+    console.log('[module-api] Resetting module database using simple GET endpoint...');
     
-    const response = await fetch(API_ENDPOINTS.RESET_DB, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
+    // Import the clearModuleStorage function
+    const { clearModuleStorage } = await import('./module-storage');
+    
+    // Use the simplified GET endpoint instead
+    const response = await fetch(API_ENDPOINTS.RESET_MODULE_DB, {
+      method: 'GET',
+      credentials: 'include' // Include cookies in the request
     });
     
     if (!response.ok) {
@@ -195,7 +238,15 @@ export async function resetModuleDatabase() {
     const result = await response.json();
     console.log('[module-api] Module database reset successfully:', result);
     
-    return result;
+    // Clear all localStorage data with detailed logging
+    const storageResult = clearModuleStorage(true);
+    console.log('[module-api] LocalStorage data cleared during reset:', storageResult);
+    
+    // Include storage clearing result in the API response
+    return {
+      ...result,
+      frontendCleared: storageResult
+    };
   } catch (error) {
     console.error('[module-api] Error resetting module database:', error);
     return { success: false, error: error.message };
@@ -208,14 +259,15 @@ export async function resetModuleDatabase() {
  */
 export async function clearModuleDatabase() {
   try {
-    console.log('[module-api] Clearing module database...');
+    console.log('[module-api] Clearing module database using simple GET endpoint...');
     
-    const response = await fetch(API_ENDPOINTS.CLEAR_DB, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
+    // Import the clearModuleStorage function
+    const { clearModuleStorage } = await import('./module-storage');
+    
+    // Use the simplified GET endpoint instead
+    const response = await fetch(API_ENDPOINTS.CLEAR_ALL_DB, {
+      method: 'GET',
+      credentials: 'include' // Include cookies in the request
     });
     
     if (!response.ok) {
@@ -225,7 +277,15 @@ export async function clearModuleDatabase() {
     const result = await response.json();
     console.log('[module-api] Module database cleared successfully:', result);
     
-    return result;
+    // Clear all localStorage data with detailed logging
+    const storageResult = clearModuleStorage(true);
+    console.log('[module-api] LocalStorage data cleared during database clear:', storageResult);
+    
+    // Include storage clearing result in the API response
+    return {
+      ...result,
+      frontendCleared: storageResult
+    };
   } catch (error) {
     console.error('[module-api] Error clearing module database:', error);
     return { success: false, error: error.message };
@@ -366,70 +426,52 @@ export async function syncModulesToBackend(activeModules) {
       success: false
     };
     
-    // Import parsePaneId directly to avoid circular dependency
-    const { parsePaneId } = await import('../Component/component-shared');
-    
+
+    //ACTUAL REGISTRY CREATION POINT
     // Process each active module
     for (const moduleId of activeModules) {
       try {
-        // Parse the module ID to extract type, identifier and instance
-        if (!moduleId) {
-          console.error('[module-api] Invalid module ID');
-          continue;
-        }
-        
-        const { moduleType, staticIdentifier, instanceId } = parsePaneId(moduleId);
-        
-        if (!moduleType || !staticIdentifier) {
-          console.error(`[module-api] Invalid module ID format: ${moduleId}`);
-          continue;
-        }
-        
-        // Generate a clean name from the static identifier
-        const name = staticIdentifier.replace(/Pane$/, '');
-        
-        // Check if module already exists
-        const existingModule = await getModuleById(moduleType, staticIdentifier);
-        
-        if (existingModule) {
-          console.log(`[module-api] Module ${staticIdentifier} already registered, skipping`);
-          results.modules.push({
-            id: moduleId,
-            result: existingModule
+        const parts = moduleId.split('-');
+        if (parts.length < 2) {
+          results.errors.push({
+            moduleId,
+            error: 'Invalid module ID format'
           });
           continue;
         }
         
-        // Register new module
-        const moduleData = {
-          name: name,
-          paneComponent: staticIdentifier,
-          staticIdentifier: staticIdentifier,
-          visible: true,
-          supportsStatus: true,
-          socketNamespace: `/${name.toLowerCase()}`
-        };
+        const moduleType = parts[0];
+        const identifier = parts[1];
+        const instanceId = parts.length > 2 ? parts[2] : null;
         
-        const result = await registerModule(moduleType, moduleData);
+        // Register module with backend
+        const response = await fetch(`/api/modules/${moduleType.toLowerCase()}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: identifier,
+            staticIdentifier: identifier,
+            paneComponent: identifier,
+            module_type: moduleType,
+            instanceId
+          })
+        });
         
-        if (result) {
-          console.log(`[module-api] Successfully registered module ${name} from ID ${moduleId}`, result);
-          results.modules.push({
-            id: moduleId,
-            result
-          });
+        if (response.ok) {
+          const result = await response.json();
+          results.modules.push(result);
         } else {
-          console.error(`[module-api] Failed to register module from ID ${moduleId}`);
-          results.errors.push({ 
-            moduleId, 
-            error: 'Registration failed' 
+          results.errors.push({
+            moduleId,
+            error: `API returned status ${response.status}`
           });
         }
-      } catch (error) {
-        console.error(`[module-api] Failed to register module ${moduleId}:`, error);
-        results.errors.push({ 
-          moduleId, 
-          error: error.message 
+      } catch (err) {
+        results.errors.push({
+          moduleId,
+          error: err.message
         });
       }
     }
@@ -449,6 +491,51 @@ export async function syncModulesToBackend(activeModules) {
     return {
       success: false,
       message: 'Failed to sync modules',
+      error: error.message,
+      modules: [],
+      errors: []
+    };
+  }
+}
+
+// Function consolidated with later implementation
+
+/**
+ * Synchronize active modules with the backend
+ * Can be called with activeModules or will retrieve them from storage if not provided
+ * @param {Array} [activeModules] - Optional array of active module IDs
+ * @returns {Promise<Object>} - Synchronization result
+ */
+export async function syncActiveModulesToBackend(activeModules) {
+  try {
+    console.log('[module-api] Syncing active modules to backend...');
+    
+    // If activeModules not provided, load from storage
+    if (!activeModules) {
+      // Import functions from other modules
+      const { loadActiveModules } = await import('./module-storage');
+      
+      // Load active modules from storage
+      activeModules = await loadActiveModules();
+    }
+    
+    if (!Array.isArray(activeModules) || activeModules.length === 0) {
+      console.warn('[module-api] No active modules found to sync');
+      return {
+        success: false,
+        message: 'No active modules found',
+        modules: [],
+        errors: []
+      };
+    }
+    
+    // Call the regular sync function with the loaded modules
+    return syncModulesToBackend(activeModules);
+  } catch (error) {
+    console.error('[module-api] Error syncing active modules to backend:', error);
+    return {
+      success: false,
+      message: 'Failed to sync active modules',
       error: error.message,
       modules: [],
       errors: []

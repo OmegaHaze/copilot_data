@@ -1,7 +1,7 @@
 import { useContext } from 'react'
 import { SettingsContext } from '../../Panes/Utility/Context/SettingsContext'
 import { useNotifications } from '../../Notifications/NotificationSystem';
-import { resetModuleDatabase, clearModuleDatabase } from '../../Panes/Utility/Loader/Module/module-api';
+import { clearAllModuleData } from '../../Panes/Utility/Loader/Module/module-operations';
 
 export default function PanelSetting({ 
   settingsOpen, 
@@ -18,16 +18,22 @@ export default function PanelSetting({
 
   const handleClearSession = async () => {
     const confirmed = await confirm(
-      'This will clear your session data including layouts and active modules. Are you sure?'
+      'This will clear your session data including layouts and active modules from both the server and localStorage. Are you sure?'
     );
     
     if (!confirmed) return;
     
     try {
-      // Remove grid layout
+      // Remove grid layout from server
       await fetch('/api/user/session/grid', { method: 'DELETE' });
       
-      notify('Session cleared successfully. The page will now reload.', 'success', 2000);
+      // Clear localStorage data with verbose logging
+      const { clearModuleStorage } = await import('../../Panes/Utility/Loader/Module/module-storage');
+      const clearResult = clearModuleStorage(true);
+      
+      console.log('[PanelSetting] Cleared localStorage data:', clearResult);
+      
+      notify(`Session cleared successfully. Removed ${clearResult.keysRemoved.length} items from localStorage. The page will now reload.`, 'success', 2000);
       setTimeout(() => window.location.reload(), 2000);
     } catch (err) {
       console.error('[Frontend] Session Clear Failed:', err);
@@ -37,7 +43,7 @@ export default function PanelSetting({
   
   const handleResetDb = async () => {
     const confirmed = await confirm(
-      'WARNING: This will reset the database with initial seed data. Your layouts and sessions will be replaced with defaults. Are you sure?',
+      'WARNING: This will RESET the modules database AND clear localStorage, removing any test modules or invalid data that might be causing issues, but keeping essential system modules. Are you sure?',
       'error'
     );
     
@@ -47,15 +53,15 @@ export default function PanelSetting({
       // Remove grid layout
       await fetch('/api/user/session/grid', { method: 'DELETE' });
       
-      // Reset database with seed data
-      const result = await resetModuleDatabase();
+      // Use our comprehensive function to clear everything
+      const result = await clearAllModuleData('modules');
       
       if (result.success) {
-        notify('Database reset successfully. The page will now reload.', 'success', 2000);
+        notify('Module database and localStorage reset successfully. The page will now reload.', 'success', 2000);
         setTimeout(() => window.location.reload(), 2000);
       } else {
         console.error('[Frontend] DB Reset Failed:', result.error);
-        notify('Failed to reset database: ' + result.error, 'error');
+        notify('Failed to reset data: ' + result.error, 'error');
       }
     } catch (err) {
       console.error('[Frontend] DB Reset Request Failed:', err);
@@ -65,7 +71,7 @@ export default function PanelSetting({
   
   const handleDeleteDb = async () => {
     const confirmed = await confirm(
-      'WARNING: This will DELETE all database data including your layouts and sessions. The database will be EMPTY with NO seed data. Are you sure?',
+      'WARNING: This will DELETE ALL database data AND localStorage including modules, layouts, and sessions. ALL data will be COMPLETELY DELETED with NO seed data or system modules. Are you sure?',
       'error'
     );
     
@@ -75,15 +81,15 @@ export default function PanelSetting({
       // Remove grid layout
       await fetch('/api/user/session/grid', { method: 'DELETE' });
       
-      // Delete all database entries without reseeding
-      const result = await clearModuleDatabase();
+      // Use our comprehensive function to clear everything
+      const result = await clearAllModuleData('all');
       
       if (result.success) {
-        notify('Database cleared successfully. The page will now reload.', 'success', 2000);
+        notify('Database and localStorage completely cleared successfully. The page will now reload.', 'success', 2000);
         setTimeout(() => window.location.reload(), 2000);
       } else {
         console.error('[Frontend] DB Clear Failed:', result.error);
-        notify('Failed to clear database: ' + result.error, 'error');
+        notify('Failed to clear all data: ' + result.error, 'error');
       }
     } catch (err) {
       console.error('[Frontend] DB Clear Request Failed:', err);
@@ -128,10 +134,11 @@ export default function PanelSetting({
         return (
           <div className="bg-black/70 backdrop-blur-sm p-3">
             <div className="crt-text4 text-xs">
-              <p>Reset DB will:</p>
-              <p className="mt-2">• Delete all database entries</p>
-              <p className="mt-1">• Reset layouts and session data</p>
-              <p className="mt-1">• Add default seed data automatically</p>
+              <p>Clear Modules DB will:</p>
+              <p className="mt-2">• Clear the modules database with seed data</p>
+              <p className="mt-1">• Remove any test or invalid modules</p>
+              <p className="mt-1">• Re-initialize the module registry</p>
+              <p className="mt-1">• Keep essential system modules</p>
               <p className="mt-1 text-yellow-400">• WARNING: This action cannot be undone!</p>
             </div>
           </div>
@@ -141,9 +148,10 @@ export default function PanelSetting({
           <div className="bg-black/70 backdrop-blur-sm p-3">
             <div className="crt-text4 text-xs">
               <p>Delete DB will:</p>
-              <p className="mt-2">• Delete all database entries</p>
-              <p className="mt-1">• Clear all layouts and session data</p>
-              <p className="mt-1">• Leave database empty with NO seed data</p>
+              <p className="mt-2">• Delete ALL database entries</p>
+              <p className="mt-1">• Clear ALL layouts and session data</p>
+              <p className="mt-1">• Delete ALL modules including system modules</p>
+              <p className="mt-1">• Leave database completely empty with NO seed data</p>
               <p className="mt-1 text-red-400">• WARNING: This action cannot be undone!</p>
             </div>
           </div>
@@ -225,7 +233,7 @@ export default function PanelSetting({
                 onClick={handleResetDb}
                 className="flex-grow px-2 py-1 text-right crt-link5 text-lg text-yellow-500"
               >
-                [⚠] RESET DB
+                [⚠] CLEAR MODULES DB
               </button>
             </div>
             {activeExplanation === 'reset-db' && renderExplanation('reset-db')}

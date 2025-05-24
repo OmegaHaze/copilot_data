@@ -13,6 +13,7 @@ export const MODULE_TYPES = {
 // Module-specific storage keys
 export const STORAGE_KEYS = {
   MODULE_CACHE: 'vaio_module_cache',
+  MODULE_REGISTRY: 'vaio_module_registry',
   LAYOUT_CACHE: 'vaio_layouts',
   ACTIVE_MODULES: 'vaio_active_modules',
   SESSION_DATA: 'vaio_session'

@@ -3,8 +3,7 @@
  * Central registry for React components
  */
 
-import { MODULE_TYPES } from '../Module/module-constants';
-import { STORAGE_KEYS } from './component-constants';
+import { MODULE_TYPES, STORAGE_KEYS } from '../Module/module-constants';
 import { createRegistrationKey, parsePaneId } from './component-shared';
 
 class ComponentRegistry {
@@ -34,18 +33,27 @@ class ComponentRegistry {
   async initialize() {
     if (this.initialized) return true;
     
-    const registryData = localStorage.getItem(STORAGE_KEYS.COMPONENT_REGISTRY);
-    if (registryData) {
-      try {
-        const parsed = JSON.parse(registryData);
-        if (parsed.data) this.moduleData = parsed.data;
-        if (parsed.activeModules) {
-          this.activeModules = parsed.activeModules;
-          this.restoreActiveModules();
+    try {
+      // Get module data directly from module registry - strict source of truth approach
+      console.log('[component-registry] Initializing by getting data from module registry...');
+      await this.setModuleData(); // This will fetch from moduleRegistry
+      
+      // Restore active modules from local storage
+      const registryData = localStorage.getItem(STORAGE_KEYS.MODULE_REGISTRY);
+      if (registryData) {
+        try {
+          const parsed = JSON.parse(registryData);
+          if (parsed.activeModules) {
+            this.activeModules = parsed.activeModules;
+            this.restoreActiveModules();
+          }
+        } catch (err) {
+          console.warn('[component-registry] Failed to parse registry data for active modules:', err);
         }
-      } catch (err) {
-        console.warn('[component-registry] Failed to parse registry data:', err);
       }
+    } catch (error) {
+      console.error('[component-registry] Failed to initialize from module registry:', error);
+      throw error; // Crash in strict mode
     }
     
     this.initialized = true;
@@ -58,25 +66,33 @@ class ComponentRegistry {
       return;
     }
     
+    // Log active modules to understand what we're working with
+    console.log('[component-registry] Restoring active modules:', this.activeModules.length);
+    
     this.activeModules.forEach(({ moduleType, staticIdentifier, instanceId }) => {
       if (!(moduleType && staticIdentifier && instanceId)) {
         console.warn(`[component-registry] Invalid module data: ${JSON.stringify({ moduleType, staticIdentifier, instanceId })}`);
         return;
       }
       
+      // Create the registration key which is what matters most for component resolution
       const key = createRegistrationKey(moduleType, staticIdentifier, instanceId);
+      console.debug(`[component-registry] Processing registration key: ${key}`);
+      
+      // Ensure module type exists in moduleData
+      if (!this.moduleData) this.moduleData = {};
+      if (!this.moduleData[moduleType]) this.moduleData[moduleType] = [];
+      
+      // Find existing module info if available
       const moduleList = this.moduleData[moduleType];
-      if (!moduleList) {
-        console.warn(`[component-registry] Module type ${moduleType} not found in moduleData`);
-        return;
-      }
+      const moduleInfo = Array.isArray(moduleList) ? 
+        moduleList.find(m => {
+          const identifier = m?.staticIdentifier || m?.module || m?.paneComponent;
+          return identifier === staticIdentifier;
+        }) : null;
       
-      // Use standardized property lookup
-      const moduleInfo = moduleList.find(m => {
-        const identifier = m.staticIdentifier || m.module;
-        return identifier === staticIdentifier;
-      });
-      
+      // Only notify for module state changes - don't create placeholders
+      // This simplifies the system to focus on key-based operations
       if (moduleInfo) {
         this.notifyListeners('moduleStateChanged', {
           activeModule: key,
@@ -84,7 +100,16 @@ class ComponentRegistry {
           action: 'activate'
         });
       } else {
-        console.warn(`[component-registry] Module info not found for ${staticIdentifier}`);
+        // Just log it for debugging but use just the key for component resolution
+        console.debug(`[component-registry] Module info not found for ${staticIdentifier}`);
+        
+        // No need to create placeholders - component-loader will handle resolution
+        this.notifyListeners('moduleStateChanged', {
+          activeModule: key,
+          moduleType,
+          staticIdentifier,
+          action: 'activate-key-only'
+        });
       }
     });
   }
@@ -127,9 +152,8 @@ class ComponentRegistry {
       activeModules: this.activeModules
     };
     
-    // Update both storage keys to maintain consistency
-    localStorage.setItem(STORAGE_KEYS.COMPONENT_REGISTRY, JSON.stringify(registryData));
-    localStorage.setItem(STORAGE_KEYS.COMPONENT_CACHE, JSON.stringify(registryData));
+    // Use MODULE storage keys for consistency across the system
+    localStorage.setItem(STORAGE_KEYS.MODULE_REGISTRY, JSON.stringify(registryData));
   }
 
   updateModuleStateFromSession(moduleIds) {
@@ -158,28 +182,56 @@ class ComponentRegistry {
     if (typeof handler === 'function') this.errorHandler = handler;
   }
 
-  setModuleData(data) {
-    if (!data) {
-      console.error('[component-registry] Cannot set module data: data is null or undefined');
-      return;
-    }
-    
-    // Initialize with MODULE_TYPES structure
-    this.moduleData = Object.values(MODULE_TYPES).reduce((acc, type) => {
-      acc[type] = Array.isArray(data[type]) ? [...data[type]] : [];
-      if (!Array.isArray(data[type])) {
-        console.warn(`[component-registry] Module data for type ${type} is not an array, using empty array`);
+  async setModuleData(data = null) {
+    // In strict approach, always get data from module registry first
+    try {
+      // Import moduleRegistry and use it as the definitive source
+      const moduleRegistry = await import('../Module/module-registry').then(m => m.default);
+      
+      // Ensure module registry is initialized
+      if (!moduleRegistry.initialized) {
+        console.log('[component-registry] Module registry not initialized, initializing now...');
+        await moduleRegistry.initialize();
       }
-      return acc;
-    }, {});
-    
-    this.updateComponentRegistry();
-
-    this.notifyListeners('moduleDataChanged', {
-      moduleData: this.moduleData,
-      activeModules: this.activeModules,
-      timestamp: Date.now()
-    });
+      
+      // Get the latest data directly from module registry
+      const registryData = moduleRegistry.getAllModules();
+      
+      if (!registryData) {
+        throw new Error('Module registry did not provide valid data');
+      }
+      
+      console.log('[component-registry] Using data from module registry:', {
+        SYSTEM: Array.isArray(registryData.SYSTEM) ? registryData.SYSTEM.length : 0,
+        SERVICE: Array.isArray(registryData.SERVICE) ? registryData.SERVICE.length : 0,
+        USER: Array.isArray(registryData.USER) ? registryData.USER.length : 0
+      });
+      
+      // Initialize with MODULE_TYPES structure and ensure arrays
+      this.moduleData = Object.values(MODULE_TYPES).reduce((acc, type) => {
+        // Make sure each type is initialized with an empty array
+        acc[type] = [];
+        
+        // Copy data from registry if it exists
+        if (registryData[type] && Array.isArray(registryData[type])) {
+          acc[type] = [...registryData[type]];
+        }
+        
+        return acc;
+      }, {});
+      
+      this.updateComponentRegistry();
+  
+      this.notifyListeners('moduleDataChanged', {
+        moduleData: this.moduleData,
+        activeModules: this.activeModules,
+        timestamp: Date.now(),
+        source: 'moduleRegistry'
+      });
+    } catch (error) {
+      console.error('[component-registry] Critical error getting data from module registry:', error);
+      throw error; // In strict mode, propagate errors
+    }
   }
 
   countModules() {

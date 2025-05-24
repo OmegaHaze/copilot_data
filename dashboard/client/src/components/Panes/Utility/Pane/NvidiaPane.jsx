@@ -41,3 +41,20 @@ export default function NvidiaPane({
     </div>
   );
 }
+
+// Add component metadata for module system registration
+NvidiaPane.moduleMetadata = {
+  name: 'NVIDIA GPU',
+  module: 'nvidia',
+  description: 'NVIDIA GPU Monitoring Module',
+  category: 'service',
+  paneComponent: 'NvidiaPane',
+  staticIdentifier: 'NvidiaPane',
+  defaultSize: 'null',
+  visible: true,
+  supportsStatus: true,
+  socketNamespace: '/nvidia',
+  autostart: false,
+  logoUrl: null,
+  module_type: 'SERVICE' // This component is part of the SERVICE module type
+};

@@ -1,65 +1,61 @@
-from fastapi import APIRouter, Depends
-from sqlmodel import Session, text
-from backend.db.session import get_session
-from typing import Dict
-import subprocess
-import os
-import sys
+from fastapi import APIRouter, status, Request, Body
+from typing import Dict, Any, Optional
+import logging
+
+# Import the functions we need from reset_db
+from backend.reset_db import clear_module_tables, reset_entire_database
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.post("/reset-db")
-async def reset_database(session: Session = Depends(get_session)):
+@router.post("/reset-db", status_code=status.HTTP_200_OK)
+async def reset_database(request: Request, data: Optional[Dict] = Body(None)):
     """
-    Reset the database by running the reset_db.py script.
-    This will delete ALL data and regenerate everything from scratch with seed data.
+    Reset the module tables only.
+    This will clear all module data but preserve other data.
     """
     try:
-        # Get the absolute path to the reset_db.py script
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-        reset_script_path = os.path.join(project_root, "reset_db.py")
-        
-        # Run the reset_db.py script
-        result = subprocess.run(
-            [sys.executable, reset_script_path],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        
-        return {
-            "success": True,
-            "message": "Database reset successfully",
-            "details": result.stdout
-        }
-    except subprocess.CalledProcessError as e:
+        # Get user from cookie for logging, but don't enforce auth
+        user_id = request.cookies.get("vaio_user")
+        if user_id:
+            logger.info(f"User {user_id} is resetting the module database")
+        else:
+            logger.info("Anonymous user is resetting the module database")
+            
+        # Call our dedicated function from reset_db.py
+        return clear_module_tables()
+    except Exception as e:
+        logger.error(f"Error resetting module database: {str(e)}")
+        # Return error with 200 status to avoid 422
         return {
             "success": False,
-            "error": "Error resetting database",
-            "details": e.stderr
+            "message": "Error during reset operation",
+            "error": str(e)
         }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
 
-# FIXED: Changed from @router.delete to @router.post to match frontend expectation
-@router.post("/clear-db")
-async def clear_database():
-    """Clear the database tables without reseeding - now accepts POST to match frontend"""
+@router.post("/clear-db", status_code=status.HTTP_200_OK)
+async def clear_database(request: Request, data: Optional[Dict] = Body(None)):
+    """
+    Reset the entire database.
+    This will delete ALL data from all tables and recreate them empty.
+    WARNING: This is a destructive operation that cannot be undone.
+    """
     try:
-        # Drop all tables and recreate them
-        from sqlmodel import SQLModel
-        from backend.db.session import engine
-        from backend.db import models  # ensure all models are imported
+        # Get user from cookie for logging, but don't enforce auth
+        user_id = request.cookies.get("vaio_user")
+        if user_id:
+            logger.info(f"User {user_id} is clearing the entire database")
+        else:
+            logger.info("Anonymous user is clearing the entire database")
         
-        # Drop all tables - completely wipe the database
-        SQLModel.metadata.drop_all(engine)
-        
-        return {
-            "success": True,
-            "message": "Database cleared successfully"
-        }
+        # Call our dedicated function from reset_db.py
+        return reset_entire_database()
     except Exception as e:
+        logger.error(f"Error clearing database: {str(e)}")
         return {
-            "success": False, 
+            "success": False,
+            "message": "Error during database clear operation",
             "error": str(e)
         }

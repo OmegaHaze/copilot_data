@@ -1,13 +1,26 @@
 /**
  * module-operations.js
  * Operations for managing module instances
+ * 
+ * This module handles the core operations for managing modules in the system:
+ * - Adding new module instances
+ * - Removing module instances
+ * - Toggling modules on/off
+ * - Persisting module state
+ * 
+ * REGISTRY INTEGRATION:
+ * The system now uses the Module Registry as the independent source of truth:
+ * - Module Registry - Manages module metadata, instances, and data structure
+ * 
+ * Previously, this system was integrated with the component registry, but now
+ * it operates independently with its own module registry.
  */
 
 import { MODULE_TYPES } from './module-constants';
 import { getCanonicalKey, createPaneId, getInstanceId } from './module-shared';
 import { synchronizeLayoutAndModules } from '../Layout/layout-shared.js';
 import { saveLayoutsToSession } from '../Layout/layout-storage.js';
-import registry from '../Component/component-registry';
+import moduleRegistry from './module-registry';
 
 /**
  * MODULE-FLOW-6.2.1: Module Instance Finding - Instance Detection
@@ -103,6 +116,16 @@ export async function addModule(moduleKey, activeModules, gridLayout) {
  * COMPONENT: Module System - Instance Removal
  * PURPOSE: Removes all instances of a module type
  * FLOW: Core function for removing modules from dashboard
+ * 
+ * REGISTRY INTEGRATION:
+ * When removing modules, we need to:
+ * 1. Remove the module from the active modules list
+ * 2. Remove the module from the grid layout
+ * 3. Unregister from the module registry
+ * 
+ * The module registry ensures that all module data is properly cleaned up
+ * when instances are removed from the dashboard.
+ * 
  * @param {string} moduleType - Module type to remove
  * @param {Array} activeModules - Current active modules
  * @param {Object} gridLayout - Current grid layout
@@ -124,23 +147,24 @@ export function removeModule(moduleType, activeModules, gridLayout) {
   const { layouts, modules } = synchronizeLayoutAndModules(updatedLayout, updatedModules);
 
   /********************************************************************
-   * 🔄 COMPONENT REGISTRY INTEGRATION 🔄
+   * 🔄 MODULE REGISTRY INTEGRATION 🔄
    * 
    * After removing modules from the active list, we also need to
-   * unregister them from the component registry.
+   * unregister them from the module registry.
    * 
-   * The component registry is the "source of truth" for currently loaded
-   * React components, while the module system tracks which ones are
-   * active in the user's dashboard.
+   * The module registry is the "source of truth" for currently loaded
+   * modules, and we need to ensure it stays in sync with the active
+   * modules in the user's dashboard.
    ********************************************************************/
   
-  // Notify registry about removed instances
+  // Notify module registry about removed instances
   if (instances.length > 0) {
     instances.forEach(instanceId => {
       try {
-        registry.unregisterComponent(instanceId);
+        // Unregister from module registry
+        moduleRegistry.unregisterModule(instanceId);
       } catch (err) {
-        console.warn(`Failed to unregister component ${instanceId}:`, err);
+        console.warn(`Failed to unregister module ${instanceId}:`, err);
       }
     });
   }
@@ -167,6 +191,53 @@ export async function toggleModule(moduleType, activeModules, gridLayout) {
   return hasInstances
     ? { ...removeModule(moduleType, activeModules, gridLayout), action: 'removed' }
     : { ...(await addModule(moduleType, activeModules, gridLayout)), action: 'added' };
+}
+
+/**
+ * MODULE-FLOW-6.2.7: Module Clear State - Complete Reset
+ * COMPONENT: Module System - State Clearing
+ * PURPOSE: Clears all module data (localStorage and backend)
+ * FLOW: Called when user wants to completely reset system
+ * @param {string} clearType - Type of clear ('modules', 'all')
+ * @returns {Promise<Object>} - Result of the operation
+ */
+export async function clearAllModuleData(clearType = 'modules') {
+  try {
+    console.log(`[module-operations] Clearing all module data (type: ${clearType})...`);
+    
+    // Import the functions we need
+    const { clearModuleStorage } = await import('./module-storage');
+    const { resetModuleDatabase, clearModuleDatabase } = await import('./module-api');
+    
+    // Clear localStorage regardless of clearType
+    clearModuleStorage();
+    
+    // Clear backend data based on clearType
+    if (clearType === 'all') {
+      // Clear entire database
+      const result = await clearModuleDatabase();
+      return {
+        success: result.success,
+        message: 'All module data cleared (localStorage and database)',
+        backendResult: result
+      };
+    } else {
+      // Reset only module tables
+      const result = await resetModuleDatabase();
+      return {
+        success: result.success,
+        message: 'Module data cleared (localStorage and module tables)',
+        backendResult: result
+      };
+    }
+  } catch (error) {
+    console.error('[module-operations] Error clearing module data:', error);
+    return {
+      success: false,
+      message: 'Failed to clear module data',
+      error: error.message
+    };
+  }
 }
 
 /**

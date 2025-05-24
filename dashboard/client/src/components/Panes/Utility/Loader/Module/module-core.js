@@ -231,14 +231,27 @@ export function cacheModuleData(moduleData) {
       return false;
     }
     
+    // Update the MODULE_REGISTRY which is the authoritative source
+    localStorage.setItem(STORAGE_KEYS.MODULE_REGISTRY, JSON.stringify({
+      timestamp: Date.now(),
+      data: moduleData
+    }));
+    
+    // Also update the MODULE_CACHE as a literal copy
     localStorage.setItem(STORAGE_KEYS.MODULE_CACHE, JSON.stringify({
       timestamp: Date.now(),
       data: moduleData
     }));
     
+    console.log('[module-core] Module data cached to registry and cache:', {
+      SYSTEM: moduleData.SYSTEM.length,
+      SERVICE: moduleData.SERVICE.length,
+      USER: moduleData.USER.length
+    });
+    
     return true;
   } catch (err) {
-    console.warn('[module-core] Failed to cache module data:', err);
+    console.error('[module-core] Failed to cache module data:', err);
     return false;
   }
 }
@@ -250,25 +263,55 @@ export function cacheModuleData(moduleData) {
  */
 export function loadCachedModuleData(maxAge = 24 * 60 * 60 * 1000) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.MODULE_CACHE);
-    if (!raw) return null;
+    // First try the registry (primary source)
+    const rawRegistry = localStorage.getItem(STORAGE_KEYS.MODULE_REGISTRY);
     
-    const parsed = JSON.parse(raw);
-    
-    // Check if cache is stale
-    if (Date.now() - parsed.timestamp > maxAge) {
-      console.log('[module-core] Module cache is stale');
-      return null;
+    if (rawRegistry) {
+      const parsedRegistry = JSON.parse(rawRegistry);
+      
+      // Check if registry data is stale
+      if (Date.now() - parsedRegistry.timestamp <= maxAge) {
+        if (validateModulesCollection(parsedRegistry.data)) {
+          console.log('[module-core] Using module data from registry:', {
+            SYSTEM: Array.isArray(parsedRegistry.data.SYSTEM) ? parsedRegistry.data.SYSTEM.length : 0,
+            SERVICE: Array.isArray(parsedRegistry.data.SERVICE) ? parsedRegistry.data.SERVICE.length : 0,
+            USER: Array.isArray(parsedRegistry.data.USER) ? parsedRegistry.data.USER.length : 0
+          });
+          return parsedRegistry.data;
+        }
+      }
     }
     
-    if (!validateModulesCollection(parsed.data)) {
-      console.warn('[module-core] Invalid cached module data');
-      return null;
+    // If registry failed or was invalid, try cache as a backup
+    const rawCache = localStorage.getItem(STORAGE_KEYS.MODULE_CACHE);
+    
+    if (rawCache) {
+      const parsedCache = JSON.parse(rawCache);
+      
+      // Check if cache data is stale
+      if (Date.now() - parsedCache.timestamp <= maxAge) {
+        if (validateModulesCollection(parsedCache.data)) {
+          console.log('[module-core] Using module data from cache (registry unavailable):', {
+            SYSTEM: Array.isArray(parsedCache.data.SYSTEM) ? parsedCache.data.SYSTEM.length : 0,
+            SERVICE: Array.isArray(parsedCache.data.SERVICE) ? parsedCache.data.SERVICE.length : 0,
+            USER: Array.isArray(parsedCache.data.USER) ? parsedCache.data.USER.length : 0
+          });
+          
+          // Sync back to registry since we're using cache data
+          localStorage.setItem(STORAGE_KEYS.MODULE_REGISTRY, JSON.stringify({
+            timestamp: Date.now(),
+            data: parsedCache.data
+          }));
+          
+          return parsedCache.data;
+        }
+      }
     }
     
-    return parsed.data;
+    console.log('[module-core] No valid module data found in registry or cache');
+    return null;
   } catch (err) {
-    console.warn('[module-core] Failed to load cached module data:', err);
+    console.warn('[module-core] Failed to load module data:', err);
     return null;
   }
 }

@@ -55,10 +55,31 @@ export default function PaneMatrix() {
   useEffect(() => {
     async function bootstrap() {
       try {
-        // MODULE-FLOW-8.1.4.1: Component Registry Initialization
+        // MODULE-FLOW-8.1.4.0: Module System Initialization FIRST
+        // COMPONENT: UI Layer - Core Module System
+        // PURPOSE: Initializes the module registry and discovers all modules
+        // FLOW: Loads module definitions as the source of truth for components
+        console.log('[PaneMatrix] Initializing module system FIRST...');
+        try {
+          const { initModuleSystem } = await import('../Loader/Module/module-index');
+          const moduleResult = await initModuleSystem(true); // force refresh
+          console.log('[PaneMatrix] Module system initialized successfully:', moduleResult);
+          
+          // Crash if module system fails - strict approach
+          if (!moduleResult.success) {
+            throw new Error('Module system initialization failed - cannot continue in strict mode');
+          }
+        } catch (moduleError) {
+          console.error('[PaneMatrix] CRITICAL: Failed to initialize module system:', moduleError);
+          // In strict mode, we must crash if module system fails
+          throw new Error(`Module system failed: ${moduleError.message}`);
+        }
+        
+        // MODULE-FLOW-8.1.4.1: Component Registry Initialization SECOND
         // COMPONENT: UI Layer - Registry Setup
-        // PURPOSE: Initializes the component registry with all available components
-        // FLOW: Loads component definitions and prepares for dynamic loading
+        // PURPOSE: Initializes the component registry using module data
+        // FLOW: Uses module registry as source of truth
+        console.log('[PaneMatrix] Initializing component system using module data...');
         const result = await initComponentSystem();
         if (!result.success) throw new Error(result.errorMessage || 'Component registry failed');
         

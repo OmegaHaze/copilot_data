@@ -13,6 +13,7 @@ from backend.routes.module.routes_modules import router as module_router
 from backend.routes.module.routes_api_modules import router as api_modules_router
 from backend.routes.module.routes_module_installer import router as module_installer_router
 from backend.routes.module.routes_reset_db import router as reset_db_router
+from backend.routes.module.routes_db_operations import router as db_operations_router
 from backend.routes.user.routes_user import router as user_router
 from backend.routes.user.routes_api_users import router as api_users_router
 from backend.routes.layout.pane_layout import router as pane_layout_router
@@ -44,6 +45,7 @@ router.include_router(module_router, prefix="/api/modules", tags=["Modules"])
 router.include_router(api_modules_router, prefix="/api", tags=["Modules API"])
 router.include_router(module_installer_router, prefix="/api/modules/installer", tags=["Module Installation"])
 router.include_router(reset_db_router, prefix="/api/modules", tags=["Database Operations"])
+router.include_router(db_operations_router, prefix="/api/modules", tags=["Database Operations"])
 
 # ===== USERS =====
 router.include_router(user_router, prefix="/api/user", tags=["User Management"])

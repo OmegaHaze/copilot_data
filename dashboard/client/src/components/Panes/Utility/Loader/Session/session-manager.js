@@ -170,38 +170,41 @@ export async function fetchAndSyncSessionData(setGridLayout, setActiveModules, s
       };
       saveToSessionStorage(STORAGE_KEYS.SESSION_DATA, sessionData);
       
-      // Import registry dynamically to ensure we get the latest instance
-      const registry = await import('../Component/component-registry').then(m => m.default);
-      if (registry && Array.isArray(backendData.activeModules)) {
-        // Check if registry is initialized
-        if (!registry.initialized) {
-          await registry.initialize();
+      // First import and initialize module registry - the source of truth
+      const moduleRegistry = await import('../Module/module-registry').then(m => m.default);
+      
+      // Ensure module registry is initialized - no fallbacks
+      if (!moduleRegistry.initialized) {
+        console.info('[session-manager] Initializing module registry');
+        await moduleRegistry.initialize(true); // Force refresh to ensure data is current
+      }
+      
+      // Get the module data directly from module registry
+      const moduleData = moduleRegistry.getAllModules();
+      console.info('[session-manager] Retrieved module data from module registry');
+      
+      // Now import component registry and update it with module data
+      const componentRegistry = await import('../Component/component-registry').then(m => m.default);
+      if (componentRegistry && Array.isArray(backendData.activeModules)) {
+        // Initialize component registry if needed
+        if (!componentRegistry.initialized) {
+          await componentRegistry.initialize();
         }
         
         // First log existing event listeners
-        const existingListeners = registry.eventListeners?.moduleStateChanged || [];
+        const existingListeners = componentRegistry.eventListeners?.moduleStateChanged || [];
         console.info(`[session-manager] Registry has ${existingListeners.length} moduleStateChanged listeners`);
         
         // Notify listeners about module state change
-        registry.notifyListeners('moduleStateChanged', { 
+        componentRegistry.notifyListeners('moduleStateChanged', { 
           activeModules: backendData.activeModules 
         });
         
         console.info(`[session-manager] Notified registry about ${backendData.activeModules.length} active modules`);
         
-        // Use discovered module data only - no fallbacks
-        try {
-          // Check if component resolver has discovered module data
-          if (window.discoveredModuleData) {
-            registry.setModuleData(window.discoveredModuleData);
-            console.info('[session-manager] Populated component cache with discovered module data');
-          } else {
-            console.error('[session-manager] No discovered module data available');
-          }
-        } catch (err) {
-          console.error('[session-manager] Failed to populate component cache:', err);
-          throw err;
-        }
+        // Set module data from module registry to component registry - strict approach
+        componentRegistry.setModuleData(moduleData);
+        console.info('[session-manager] Updated component registry with module registry data');
       }
     } catch (err) {
       console.error('[session-manager] Failed to notify registry:', err);

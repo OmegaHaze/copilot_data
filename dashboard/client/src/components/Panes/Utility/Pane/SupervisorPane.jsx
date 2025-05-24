@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSocket } from '../Context/SocketContext.jsx';
 import PaneHeader from '../PaneHeader.jsx';
 
-export default function SupervisorPane({
+function SupervisorPane({
   id,
   moduleType = 'SYSTEM',
   staticIdentifier = 'SupervisorPane',
@@ -119,3 +119,22 @@ export default function SupervisorPane({
     </div>
   );
 }
+
+// Add metadata that matches the DB fields directly to the component
+SupervisorPane.moduleMetadata = {
+  name: 'Supervisor',
+  module: 'supervisor',
+  description: 'System Supervisor Module', 
+  category: 'system',
+  paneComponent: 'SupervisorPane',
+  staticIdentifier: 'SupervisorPane',
+  defaultSize: 'null',
+  visible: true,
+  supportsStatus: true,
+  socketNamespace: '/supervisor',
+  autostart: false,
+  logoUrl: null,
+  module_type: 'SYSTEM'
+};
+
+export default SupervisorPane;

@@ -3,20 +3,14 @@
  * Constants specific to the component system
  */
 
-// Import module types from canonical source
-import { MODULE_TYPES } from '../Module/module-constants';
-export { MODULE_TYPES };
+// Import canonical constants from the module system
+import { MODULE_TYPES, STORAGE_KEYS } from '../Module/module-constants';
+export { MODULE_TYPES, STORAGE_KEYS };
 
 // API endpoints
 export const API_ENDPOINTS = {
   MODULES: '/api/modules',
   COMPONENT_RESOLVER: '/api/components/resolve'
-};
-
-// Component storage keys
-export const STORAGE_KEYS = {
-  COMPONENT_CACHE: 'vaio_component_cache',
-  COMPONENT_REGISTRY: 'vaio_component_registry' // Separate key for component registry
 };
 
 // Request timeouts

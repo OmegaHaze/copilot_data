@@ -19,6 +19,22 @@ export function getCanonicalKey(moduleType) {
 }
 
 /**
+ * Create a registration key for module tracking
+ * @param {string} moduleType - Module type
+ * @param {string} identifier - Static identifier
+ * @param {string} instanceId - Instance ID (optional)
+ * @returns {string} - Registration key
+ */
+export function createRegistrationKey(moduleType, identifier, instanceId = null) {
+  if (!moduleType || !identifier) return null;
+  
+  const canonicalType = getCanonicalKey(moduleType);
+  return instanceId
+    ? `${canonicalType}-${identifier}-${instanceId}`
+    : `${canonicalType}-${identifier}`;
+}
+
+/**
  * Create a pane ID from parts
  * @param {string} moduleType - Module type
  * @param {string} staticIdentifier - Static identifier
@@ -35,10 +51,9 @@ export function createPaneId(moduleType, staticIdentifier, instanceId = null) {
 
 /**
  * Generate a unique instance ID
- * @param {string} prefix - Optional prefix (ignored, kept for compatibility)
  * @returns {string} Simple, short alphanumeric ID (4 chars)
  */
-export function getInstanceId(prefix = '') {
+export function getInstanceId() {
   // Generate a simple 4-character random alphanumeric string
   return Math.random().toString(36).substring(2, 6);
 }

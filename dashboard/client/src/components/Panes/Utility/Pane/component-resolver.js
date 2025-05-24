@@ -80,34 +80,30 @@ export async function discoverComponents() {
   };
 
   try {
-    const rawCache = localStorage.getItem('vaio_component_registry');
-    if (rawCache) {
-      const parsed = JSON.parse(rawCache);
-      const data = parsed?.data;
-      if (data) {
-        discoveredData = {
-          SYSTEM: data.SYSTEM || [],
-          SERVICE: data.SERVICE || [],
-          USER: data.USER || []
-        };
-      }
-    } else {
-      // If no local cache, we could potentially fetch from the module-api
-      try {
-        const moduleApi = await import('../Loader/Module/module-api');
-        const modules = await moduleApi.fetchModules();
-        if (modules) {
-          // Group modules by type
-          Object.keys(modules).forEach(type => {
-            if (discoveredData[type]) {
-              discoveredData[type] = modules[type].map(m => m.paneComponent || m.staticIdentifier);
-            }
-          });
-        }
-      } catch (apiErr) {
-        console.warn('[component-resolver] Failed to fetch modules from API:', apiErr);
-      }
+    // Import the module registry and use it as the sole source of truth
+    const moduleRegistry = await import('../Loader/Module/module-registry').then(m => m.default);
+    
+    // Make sure module registry is initialized
+    if (!moduleRegistry.initialized) {
+      console.log('[component-resolver] Initializing module registry');
+      await moduleRegistry.initialize();
     }
+    
+    // Get data directly from module registry - no fallbacks
+    const registryData = moduleRegistry.getAllModules();
+    
+    // Use module registry data as the only source of truth
+    discoveredData = {
+      SYSTEM: registryData.SYSTEM || [],
+      SERVICE: registryData.SERVICE || [],
+      USER: registryData.USER || []
+    };
+    
+    console.log('[component-resolver] Using module registry data:', {
+      SYSTEM: discoveredData.SYSTEM.length,
+      SERVICE: discoveredData.SERVICE.length,
+      USER: discoveredData.USER.length
+    });
   } catch (err) {
     console.warn('[component-resolver] Failed to parse registry cache for component discovery:', err);
   }
@@ -134,8 +130,24 @@ if (typeof window !== 'undefined') {
     console.log('[component-resolver] Resolver initialized');
   }
   
-  // Make discovered data available
-  window.discoveredModuleData = discoverComponents();
+  // Import module registry and use it to initialize the resolver
+  import('../Loader/Module/module-registry').then(async m => {
+    const moduleRegistry = m.default;
+    
+    // Make sure module registry is initialized - enforce strict approach
+    if (!moduleRegistry.initialized) {
+      try {
+        await moduleRegistry.initialize();
+        console.log('[component-resolver] Successfully initialized module registry');
+      } catch (error) {
+        console.error('[component-resolver] Failed to initialize module registry:', error);
+        throw error; // Crash if module registry fails to initialize
+      }
+    }
+  }).catch(err => {
+    console.error('[component-resolver] Error initializing with module registry:', err);
+    throw err; // Crash if there's any error
+  });
 }
 
 export default resolveComponent;
